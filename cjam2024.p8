@@ -21,15 +21,23 @@ __lua__
 ---[x]npcs
 ---[x]transitions
 --combat state
----player grid, enemy grid
+---[x]player grid, enemy grid
 ---turns
----select card
----select target
+---[x]select card
+---[x]select target
 ---cards, random draw
 ---card effects, dmg, heal
 
 ---multiple characters
 ---=multiple moves	
+
+--card select
+--z zelect, x examine
+---examine mode
+
+--design cards
+--equipment
+
 -->8
 --life cycle functions
 
@@ -96,7 +104,7 @@ function mk_title_st()
 	
 	function	st:update()
 		if(btnp(❎))then
-			app_state=mk_combat_st()
+			app_state=mk_active_g_st()
 		end
 	end
 	
@@ -112,15 +120,19 @@ end
 
 function mk_active_g_st()
 	local st = {}
+	st.screen_st=mk_combat_st()
+	st.party={
+		{
+			mk_hero()
+		}
+	}
 	
 	function st:update()
-	
+		st.screen_st:update()
 	end
 	
 	function st:draw()
-		local t='active game!'
-		local lp=cent_txt_pos(t)
-		print(t,lp[1],lp[2])
+		st.screen_st:draw()	
 	end
 	
 	return st
@@ -623,7 +635,9 @@ end
 const={
 	letter_width=4,
 	letter_height=5,
-	line_height=8
+	line_height=8,
+	card_width=34,
+	card_height=40
 }
 
 
@@ -731,7 +745,7 @@ end
 --get center text x
 --(line of text, width of space)
 function cent_txt_x(txt,x,w)
-	local lw=const.letter_width 
+	local lw=const.letter_width
 	local txt_lw -- text line width
 	local dif_w -- width difference
 	
@@ -900,6 +914,24 @@ function mk_diag(p,txt)
 	
 	return diag
 end
+
+function draw_stats(ent)
+	local h = 26
+	local x = 8
+	local y = 2
+	local marg=6
+	local lh=const.letter_width
+	local lih=const.line_height
+	
+	rectfill(x,y,120,h,0)
+	rect(x,y,120,h,7)
+	local hp_str
+	hp_str=ent.hp.."/"..ent.maxhp
+	local hp_str_w=#hp_str*lh
+	print(ent.name,x+marg,y+marg,12)
+	print(hp_str,x+marg,y+marg+lih,7)	
+	print(" ♥",x+marg+hp_str_w,y+marg+lih,8)	
+end
 -->8
 --type def
 
@@ -919,22 +951,23 @@ end
 --create grids
 function mk_combat_st()
 	local st={}
-	st.pg=mk_grid(
+	st.pg=mk_grid( --player grid
 		{
 			x=10,
-			y=38,
+			y=30,
 			ents={mk_hero()},
-			sel=5
+--			sel=5
 		}
-	) --player grid
+	)
 	st.eg=mk_grid({ --enemy grid
 		x=70,
-		y=38,
+		y=30,
 		ents={
 			mk_robe()
 		}
 	})
-	st.sel=5
+	st.party=mk_c_party()
+	st.hand=mk_hand()
 	
 	function st:update()
 		st.cont:update(self)
@@ -944,13 +977,15 @@ function mk_combat_st()
 	
 	function st:draw()
 		rectfill(0,0,128,128,1)
-		self.pg:draw()
-		self.eg:draw()
+		self.pg:draw(self)
+		self.eg:draw(self)
+		self.hand:draw()
+--		draw_card(20,85,self.hand.cards[1])
 	end
 	
 	function st.mk_combat_cont()
 		local cont={
-			st='select',
+			st='sel_c',
 			st_conts={}
 		}
 		function cont:set(st)
@@ -964,30 +999,101 @@ function mk_combat_st()
 			cont=self.st_conts[self.st]
 			cont(self,a_st)
 		end
-
-		function	cont.st_conts:select(a_st)
-			local pg=a_st.pg
-			local sel=pg.sel
-			if(btnp(⬆️)and sel>3)then
-			 pg.sel-=3
+		
+		function cont.st_conts:sel_c(a_st)
+			local hand=a_st.hand
+			if(btnp(⬆️) or btnp(➡️))then
+			 hand.sel+=1
+			 if(hand.sel>#hand.cards)then
+			 	hand.sel=1
+			 end
 			end
-			if(btnp(➡️)and sel%3!=0)then
-				pg.sel+=1
+			if(btnp(⬅️) or btnp(⬇️))then
+				hand.sel-=1
+				if(hand.sel<1)then
+			 	hand.sel=#hand.cards
+			 end
+			end
+			
+			if(btnp(🅾️))then
+				a_st.cont:set('sel_t')
+				a_st.tar_t=a_st.eg
+			end
+			
+			if(btnp(❎))then
+				a_st.cont:set('sel_g')
+				a_st.hand.sel=nil
+				a_st.pg.sel=5
+				a_st.tar_t=a_st.pg
+			end
+		end
+
+		function	cont.st_conts:sel_g(a_st)
+			local t=a_st.tar_t
+			local eg=a_st.eg
+			local pg=a_st.pg
+			local sel=t.sel
+			if(btnp(⬆️)and sel>3)then
+			 t.sel-=3
+			end
+			if(btnp(➡️))then
+				if(sel%3==0)then
+					if(t==pg)then
+						local cs=sel
+						t.sel=nil
+						a_st.tar_t=eg
+						t=eg
+						t.sel=cs-2
+					end
+				else
+					t.sel+=1
+				end
 			end
 			if(btnp(⬇️)and sel<7)then
-				pg.sel+=3
+				t.sel+=3
 			end
-			if(btnp(⬅️)
-				and sel!=1
-				and sel!=4
-				and sel!=7
-			)then
-				pg.sel-=1
+			if(btnp(⬅️))then
+				if(sel==1
+					or sel==4
+					or sel==7
+				)then
+					if(t==eg)then
+						local cs=sel
+						t.sel=nil
+						a_st.tar_t=pg
+						t=pg
+						t.sel=cs+2
+					end
+				else
+					t.sel-=1
+				end
+			end
+			if(btnp(❎))then
+				a_st.hand.sel=1
+				a_st.tar_t.sel=nil
+				a_st.cont.st='sel_c'
+				a_st.tar_t=nil
+			end
+			
+		end
+		
+		function cont.st_conts:sel_t(a_st)
+			local t=a_st.tar_t
+			local pg=a_st.pg
+			local eg=a_st.eg
+			if(btnp(➡️) and t==pg)then
+				a_st.tar_t=eg
+			end
+			if(btnp(⬅️) and t==eg)then
+				a_st.tar_t=pg
 			end
 			if(btnp(🅾️))then
 				
 			end
-			
+			if(btnp(❎))then
+				a_st.tar_t=nil
+				a_st.cont.st='sel_c'
+			end
 		end
 		
 		function	cont.st_conts:diag(a_st)
@@ -1019,26 +1125,66 @@ function mk_grid(opt)
 		end
 	end
 	
-	function grid:draw()
+	function grid:draw(a_st)
 		local x=self.x
 		local y=self.y
 		local sel=self.sel
+		local is_tar=a_st.tar_t==self
+		local dir
+		local cards
+		local sel_c
+		cards=a_st.hand.cards
+		sel_c=a_st.hand.sel
 		
-		draw_grid(x,y)
+		if(is_tar)y=y-3
+		draw_grid(x,y,is_tar)
 		draw_sel(x,y,sel)
+		if(is_tar and sel_c)then
+			print(cards[sel_c])
+			for t in all(cards[sel_c].tar) do
+				local s
+				local coord = g_pos_coord(x,y,t.pos)
+				if(t.ef=="atk")s=72
+				if(t.ef=="heal")s=74
+				if(t.ef=="move")then 
+					s=76
+					dir=t.dir
+				end
+				spr(s,coord[1],coord[2],2,2)
+				if(dir==➡️)then
+					spr(78,coord[1],coord[2],2,2)
+				end
+				if(dir==⬇️)then
+					spr(110,coord[1],coord[2],2,2,false,true)
+				end			
+				if(dir==⬅️)then
+					spr(78,coord[1],coord[2],2,2,true)
+				end			
+				if(dir==⬆️)then
+					spr(110,coord[1],coord[2],2,2)
+				end						
+			end	
+		end
 		
 		for ent in all(self.ents) do
-			local coord
-			coord=g_pos_coord(x,y,ent.pos)
-			ent:draw(coord[1],coord[2])
+			draw_ent(x,y,ent)
+			if(ent.pos==sel)then
+				draw_stats(ent)
+			end
 		end
-		palt(0,true)
 	end
 
 	return grid
 end
 
-function draw_grid(x,y)
+
+function draw_ent(x,y,ent)
+	local coord
+	coord=g_pos_coord(x,y,ent.pos)
+	ent:draw(coord[1],coord[2])
+end
+
+function draw_grid(x,y,is_tar)
 	palt(0,false)
 	thicken_row(x,y,0)
 	thicken_row(x,y+18,5)
@@ -1046,6 +1192,9 @@ function draw_grid(x,y)
 	draw_column(x,y)
 	draw_column(x+16,y)
 	draw_column(x+32,y)
+	if(is_tar)then
+		rectfill(x-2,y+53,x+49,y+58,0)
+	end
 	rectfill(x-1,y+53,x+48,y+54,6)
 	palt(0,true)
 end
@@ -1118,27 +1267,233 @@ function g_pos_coord(x,y,pos)
 	
 	return {coord_x,coord_y}
 end
+
+function draw_card(x,y,card)
+	rectfill(x,y,x+34,y+40,4)
+	rect(x,y,x+34,y+40,9)
+	
+	local cx
+	local cw=const.card_width
+	cx=cent_txt_x(card.title,x,cw)
+	print(card.title,cx,y+4)
+	
+	for pos=1,9 do
+		local coord
+		coord=sum_pos_coord(x+8,y+19,pos)
+		rect(coord[1],coord[2],coord[1]+6,coord[2]+6,5)
+	end
+	
+	local tar = card.tar
+	for t in all(tar) do
+		local coord
+		local c
+		if(t.ef=='atk')c=8
+		if(t.ef=='heal')c=11
+		
+		if(t.ef=='move')c=14
+		coord=sum_pos_coord(x+8,y+19,t.pos)
+		rectfill(coord[1],coord[2],coord[1]+6,coord[2]+6,c)
+		rect(coord[1],coord[2],coord[1]+6,coord[2]+6,5)
+		if(t.ef=='move')then
+			local arrow_pos
+			if(t.dir==⬆️)then
+				pset(coord[1]+2,coord[2]+3,8)
+				pset(coord[1]+3,coord[2]+2,8)
+				pset(coord[1]+4,coord[2]+3,8)
+			end
+			if(t.dir==➡️)then
+				pset(coord[1]+3,coord[2]+2,8)
+				pset(coord[1]+4,coord[2]+3,8)
+				pset(coord[1]+3,coord[2]+4,8)
+			end
+			if(t.dir==⬇️)then
+			 pset(coord[1]+2,coord[2]+3,8)
+				pset(coord[1]+3,coord[2]+4,8)
+				pset(coord[1]+4,coord[2]+3,8)
+			end
+			if(t.dir==⬅️)then
+				pset(coord[1]+3,coord[2]+2,8)
+				pset(coord[1]+2,coord[2]+3,8)
+				pset(coord[1]+3,coord[2]+4,8)
+			end
+			
+		end		
+	end
+end
+
+function mk_hand(opt)
+	local hand = {}
+	hand.sel=1
+	hand.cards={
+		raze_c,
+		punish_c,
+		raze_c,
+		beg_c,
+		crook_c,
+		scatter_c
+	}
+	function hand:draw()
+		local ch=const.card_height
+		local cw=const.card_width
+		local w=10*#self.cards+cw
+		local hand_x=(128-w)/2
+		local sel_x
+		
+		for i,c in ipairs(self.cards) do
+			local y = 105
+			if(self.sel==i)then
+			 sel_x=hand_x+(i-1)*10
+			else 
+				draw_card(hand_x+(i-1)*10,y,c)
+			end
+		end
+		
+		if(sel_x)then
+			draw_card(sel_x,85,self.cards[self.sel])
+		end	
+	end
+	
+	return hand
+end
+
+function sum_pos_coord(x,y,pos)
+	local coord_x
+	local coord_y
+	if(pos==1) then
+		coord_x=x
+		coord_y=y
+	end
+	if(pos==2) then
+		coord_x=x+6
+		coord_y=y
+	end
+	if(pos==3) then
+		coord_x=x+12
+		coord_y=y
+	end
+	if(pos==4) then
+		coord_x=x
+		coord_y=y+6
+	end
+	if(pos==5) then
+		coord_x=x+6
+		coord_y=y+6
+	end
+	if(pos==6) then
+		coord_x=x+12
+		coord_y=y+6
+	end
+	if(pos==7) then
+		coord_x=x
+		coord_y=y+12
+	end
+	if(pos==8) then
+		coord_x=x+6
+		coord_y=y+12
+	end
+	if(pos==9) then
+		coord_x=x+12
+		coord_y=y+12
+	end
+	
+	return {coord_x,coord_y}
+end
+
+--we're really building the party
+--here
+function mk_c_party()
+	local c_party={}--combat party
+	local party=app_state.party
+	local filled_pos={}
+	for m in all(party) do
+		local name=m.name
+		local deck={}
+		local attr={
+			maxhp=m.maxhp,
+			atk=m.atk,
+			hand=m.hand
+		}
+		local c=c
+		local pos = fill_pos(filled_pos)
+		for e in all(m.eqp) do
+			for c in all(e.cards) do
+				add(deck,c)
+			end
+			for k,v in pairs(e.attr) do
+				attr[k]+=v
+			end
+		end
+		local pm ={
+			name=name,
+			deck=deck,
+			attr=attr,
+			hp=maxhp,
+			pos=pos,
+			c=c,
+			anim=mk_animator({
+				anim_tbl={
+					idle={
+						{
+							spr=102,
+							time=10,
+						},
+						{
+						 spr=104,
+						 time=15,
+						}
+					},
+				}
+			})
+		}
+		
+	function pm:update()
+		self.anim:update()
+	end
+	function pm:draw(x,y)
+		palt(0,false)
+		palt(2,true)
+		self.anim:draw(x,y,false,2,2)
+		palt(2,false)
+		palt(0,true)
+	end
+	
+		add(c_party,pm)
+	end
+	
+	return c_party
+end
+
+function fill_pos(pos_tbl)
+	local pos=flr(rnd(9))+1
+	if(pos_tbl[pos])then
+		return fill_pos(pos_tbl)
+	else 
+		pos_tbl[pos]=true
+		return pos
+	end
+end
+---card effects, dmg, heal
+---select target
 -->8
 --combat entities
 
+--function mk_c
+
 function mk_hero()
 	local h={
-		hp=5,
-		pos=5,
-		anim=mk_animator({
-			anim_tbl={
-				idle={
-					{
-						spr=102,
-						time=10
-					},
-					{
-					 spr=104,
-					 time=15
-					}
-				},
-			}
-		})
+		name="porkronymus bosch",
+		desc="i have been told i am a failure",
+		eqp={
+			helm=helms.fool,
+			chest=chest_arm.routed,
+			bracers=bracers.scorned,
+			grieves=grieves.exile	
+		},
+--		hp=5,
+		hand=2,
+		atk=1,
+		maxhp=1,
+		c=12
 	}
 	
 	function h:update()
@@ -1157,7 +1512,9 @@ end
 
 function mk_robe()
 	local r={
-		hp=5,
+		name='robed blasphemy',
+		hp=3,
+		maxhp=3,
 		pos=3,
 		anim=mk_animator({
 			anim_tbl={
@@ -1186,6 +1543,116 @@ function mk_robe()
 	
 	return r
 end
+
+--need
+-- card obj
+-- card controller
+-- card selector
+-- raise selected card
+
+----- cards -----
+
+raze_c={
+	title="RAZE",
+	tar={
+		{pos=2,ef="atk"},
+		{pos=5,ef="atk"},
+		{pos=8,ef="atk"}
+	}
+}
+
+punish_c={
+	title="PUNISH",
+	tar={
+		{pos=2,ef="atk"},
+		{pos=4,ef="atk"},
+		{pos=5,ef="atk"},
+		{pos=6,ef="atk"},
+		{pos=8,ef="atk"}
+	}
+}
+
+beg_c={
+	title="BEG",
+	tar={
+		{pos=1,ef="heal"},
+		{pos=3,ef="heal"},
+		{pos=7,ef="heal"},
+		{pos=9,ef="heal"},
+	}
+}
+
+crook_c={
+	title="CROOK",
+	tar={
+		{pos=5,ef="move",dir=➡️},
+	}
+}
+
+scatter_c={
+	title="SCATTER",
+	tar={
+		{pos=2,ef="move",dir=⬅️},
+		{pos=5,ef="move",dir=➡️},
+		{pos=8,ef="move",dir=⬅️},
+	}
+}
+
+	
+	
+--bracers of the forsaker
+--UNGOD
+-->8
+helms={
+	fool={
+		name='helm of the fool',
+		cards={
+			raze_c
+		},
+		attr={
+			maxhp=1,
+			hand=-1
+		}
+	}
+}
+
+chest_arm={
+	routed={
+		name='chest of the routed',
+		cards={
+			scatter_c,
+			beg_c
+		},
+		attr={
+			maxhp=1
+		}
+	}
+}
+
+bracers={
+ scorned={
+		name='bracers of the scorned',
+		cards={
+			punish_c
+		},
+		attr={
+			maxhp=1,
+			atk=1
+		}
+	}
+}
+
+grieves={
+	exile={
+		name='grieves of the exile',
+		cards={
+			crook_c
+		},
+		attr={
+			maxhp=1
+		}
+	}
+}
 __gfx__
 000000001111111100449900000000000000000000e00e0000e00e00000000000000000000000000000000000000000000000000000000000000000000000000
 00000000116666110449aa900004499000e00e000cccccc00cccccc0000000000000000000000000000000000000000000000000000000000000000000000000
@@ -1235,22 +1702,22 @@ __gfx__
 0666555050000000577766656555555567777776766666669aaaaaa9a9999999e888888e8eeeeeee3bbbbbb3b3333333deeeeeededdddddd0000000088800000
 0665550500500000577666565565555567777767667666669aaaaa9a99a99999e88888e8ee8eeeee3bbbbb3b33b33333deeeeededdeddddd0000000088000000
 0000000000000000555555555555555566666666666666669999999999999999eeeeeeeeeeeeeeee3333333333333333dddddddddddddddd0000000080000000
-050505050505050556565656565656560000000000000000222e22222e2222222222222222222222000000000000000000000000000000000000000000000000
-505050505050505065656565656565650000000000000000222eeccccee22222222e22222e222222000000000000000000000000000000000000000000000000
-00000000000000000000000000000000000000000000000022cccccccccc2222222e22222e222222000000000000000000000000000000000000000000000000
-00000000000000000000000000000000000000000000000022ccceeeeeccc222222eeccccee22222000000000000000000000000000000000000000000000000
-00000000000000000000000000000000000000000000000022ccce0ee0ccccc222cccccccccc2222000000000000000000000000000000000000000000000000
-00000000000000000000000000000000000000000000000022ccccccccccc22222ccceeeeeccc222000000000000000000000000000000000000000000000000
-000000000000000000000000000000000000000000000000222ccccccccc222222ccce0ee0ccccc2000000000000000000000000000000000000000000000000
-0000000000000000000000000000000000000000000000002222ccccccc2222222ccccccccccc222000000000000000000000000000000000000000000000000
-00000000000000000000000000000000000000000000000022222dcdcd222222222ccccccccc2222000000000000000000000000000000000000000000000000
-00000000000000000000000000000000000000000000000022eecccccccee2222222ccccccc22222000000000000000000000000000000000000000000000000
-0000000000000000000000000000000000000000000000002e2ccccccccc2e2222eeddcdcddee222000000000000000000000000000000000000000000000000
-000000000000000000000000000000000000000000000000222ccccccccc22222e2ccccccccc2e22000000000000000000000000000000000000000000000000
-0000000000000000000000000000000000000000000000002222ccccccc2222222ccccccccccc222000000000000000000000000000000000000000000000000
-0000000000000000000000000000000000000000000000002222dcccccd22222222ccccccccc2222000000000000000000000000000000000000000000000000
-0000000000000000000000000000000000000000000000002222e2ddd2e22222222edcccccde2222000000000000000000000000000000000000000000000000
-0000000000000000000000000000000000000000000000002222e22222e222222222e2ddd2e22222000000000000000000000000000000000000000000000000
+050505050505050556565656565656560800000000000000222e22222e2222222222222222222222000000000000000000000000000000000000000880000000
+505050505050505065656565656565650080000000000000222eeccccee22222222e22222e222222000000000000000000000000000000000000008888000000
+00000000000000000000000000000000080000000000000022cccccccccc2222222e22222e222222000000000000000000000000000000000000088888800000
+00000000000000000000000000000000000000000000000022ccceeeeeccc222222eeccccee22222000000000000000000000000000000000000888888880000
+00000000000000000000000000000000000000000000000022ccce0ee0ccccc222cccccccccc2222000000000000000000000000000000000008888888888000
+00000000000000000000000000000000000000000000000022ccccccccccc22222ccceeeeeccc222000000000000000000000000000000000088888888888800
+000000000000000000000000000000000000000000000000222ccccccccc222222ccce0ee0ccccc2000000000000000000000000000000000888888888888880
+0000000000000000000000000000000000000000000000002222ccccccc2222222ccccccccccc222000000000000000000000000000000008888888888888888
+00000000000000000000000000000000000000000000000022222dcdcd222222222ccccccccc2222000000000000000000000000000000000000888888880000
+00000000000000000000000000000000000000000000000022eecccccccee2222222ccccccc22222000000000000000000000000000000000000888888880000
+0000000000000000000000000000000000000000000000002e2ccccccccc2e2222eeddcdcddee222000000000000000000000000000000000000888888880000
+000000000000000000000000000000000000000000000000222ccccccccc22222e2ccccccccc2e22000000000000000000000000000000000000888888880000
+0000000000000000000000000000000000000000000000002222ccccccc2222222ccccccccccc222000000000000000000000000000000000000888888880000
+0000000000000000000000000000000000000000000000002222dcccccd22222222ccccccccc2222000000000000000000000000000000000000888888880000
+0000000000000000000000000000000000000000000000002222e2ddd2e22222222edcccccde2222000000000000000000000000000000000000888888880000
+0000000000000000000000000000000000000000000000002222e22222e222222222e2ddd2e22222000000000000000000000000000000000000888888880000
 00000099990000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 00000922229000000000009999000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 00009222222900000000092222900000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
