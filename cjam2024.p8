@@ -26,7 +26,7 @@ __lua__
 ---[x]select card
 ---[x]select target
 ---[x]cards, random draw
----card effects, dmg, heal
+---[x]card effects, dmg, heal
 
 
 -----next-----
@@ -39,6 +39,7 @@ __lua__
 --life cycle functions
 
 function _init()
+	printh('','test',true)
 	timer=1
 	app_state = mk_title_st()
 end
@@ -59,11 +60,12 @@ function mk_title_st()
 	local st = {} --state
 	
 	st.title={
-		txt={
-			"cabin jam 2024 project",
-			"bingo",
-			"jammo"
-		},		
+--		txt={
+--			"cabin jam 2024 project",
+--			"bingo",
+--			"jammo"
+--		},		
+		txt={"porkronymus bosch"},
 		draw=function(self)
 		 local txt=self.txt
 			local tp
@@ -285,12 +287,8 @@ function mk_rooms(p)
 				x=8,
 				y=16,
 				txt={
-				 {
-						'hiya! ♥',
-						'boom! ★'
-					},
 					{
-						'i only tell the truth'
+						'i never tell the truth'
 					}
 				}
 			}),
@@ -298,12 +296,8 @@ function mk_rooms(p)
 				x=8,
 				y=76,
 				txt={
-				 {
-						'hiya! ♥',
-						'bang! ◆'
-					},
 					{
-						'i only tell lies'
+						'i always tell lies'
 					}
 				}
 			})
@@ -943,7 +937,6 @@ function draw_act(c)
 	local h = 26
 	local x = 8
 	local y = 2
-	exam_tbl(c)
 	local coord=cent_txt_pos(c.card.title,{x=x,y=y,h=h,w=112})
 	
 	rectfill(x,y,120,h,0)
@@ -960,10 +953,10 @@ end
 
 
 function exam_tbl(tbl)
-	printh('start','test',true)
+	printh('start','test2',true)
 	for k,v in pairs(tbl)do
-		printh(k,'test')
-		printh(v,'test')
+		printh(k,'test2')
+		printh(v,'test2')
 	end
 end
 -->8
@@ -985,10 +978,10 @@ end
 --create grids
 function mk_combat_st()
 	local st={}
+	st.turn='heroes'
 	st.g_off=0
 	st.party=mk_c_party()
 	st.shake=2
---	exam_tbl(st.party[1].attr)
 	st.pg=mk_grid( --player grid
 		{
 			x=10,
@@ -1011,14 +1004,17 @@ function mk_combat_st()
 	end
 	
 	function st:draw()
+		local ac = self.act_card
 		rectfill(0,0,128,128,1)
 		self.pg:draw(self)
 		self.eg:draw(self)
 		self.hand:draw()
 		if(self.cont.st=='wait')then
-			local s = self.hand.sel
-			local c = self.hand.cards[s]
-			draw_act(c)
+			local s=self.hand.sel
+			local pc=self.hand[s]
+			local c = pc
+			if(ac) c=ac
+			if(c) draw_act(c)
 		end
 --		draw_card(20,85,self.hand.cards[1])
 	end
@@ -1129,9 +1125,6 @@ function mk_combat_st()
 				a_st.tar_t=pg
 			end
 			if(btnp(🅾️))then
-				local h = a_st.hand
-				h.cards[h.sel].owner.active=false
-				h.cards[h.sel].owner.anim:set('casting')
 --				a_st.tar_t=nil
 				a_st.cont.st='wait'
 				sfx(1,1)
@@ -1146,23 +1139,230 @@ function mk_combat_st()
 		
 		function cont.st_conts:wait(a_st)
 			
+			local act_card=a_st.act_card
+			local tar_t=a_st.tar_t
+
+			if(act_card==nil)then
+				printh('hi','test')
+				if(a_st.turn=='enemy')then
+					printh('et','test')
+					local e=sel_active_e(a_st.eg)
+					
+					local cs=flr(rnd(#e.hand))+1
+					local	c=e.hand[cs]
+			
+					a_st.act_card=c
+					
+					--find effect with most
+					--positions
+					--use that
+					
+					local ef_count={
+						atk=0,
+						heal=0,
+						move=0
+					}
+					for t in all(c.card.tar)do
+						ef_count[t.ef]+=1
+					end
+					
+					local most_ef
+					local high_ef_count=0
+					for k,v in pairs(ef_count)do
+						if(v>high_ef_count)then
+							high_ef_count=v
+							most_ef=k
+						end
+					end
+					printh(most_ef,'eft')
+					if(most_ef=='atk')then
+						a_st.tar_t=a_st.pg
+					end
+					if(most_ef=='heal')then
+						a_st.tar_t=a_st.eg
+					end
+					if(most_ef=='move')then
+						local t=flr(rnd(2))					
+						a_st.tar_t=a_st.eg
+						if(t==1) then
+							a_st.tar_t=a_st.pg
+						end
+					end
+				else
+					local hs=a_st.hand.sel
+					local cs=a_st.hand.cards[hs]
+					a_st.act_card=cs
+				end
+				act_card=a_st.act_card
+				act_card.owner.active=false
+				act_card.owner.anim:set('casting')
+				sfx(1,1)
+			end
+			local cs = act_card
+
 			if(timer-self.w_stamp==30)then
 				sfx(-1,1)
 				sfx(2)
+				
+				local tar_p=act_card.card.tar
+				local tar_e={}
+				for e in all(a_st.tar_t.ents) do
+					for p in all(tar_p) do
+						if (e.pos==p.pos)then
+							if(p.ef=='atk')then
+								e.hp-=cs.owner.attr.atk
+							end
+							if(p.ef=='heal')then
+								e.hp+=cs.owner.attr.heal
+							end
+							if(p.ef=='move')then
+								local tp
+								tp=nav_grid(p.dir,p.pos)
+								local ok=true
+								for et in all(tar_t.ents)do
+									if(et.pos==tp) ok=false
+								end
+								if(ok)e.pos=tp
+							end
+						end
+					end
+					if(e.hp>e.attr.maxhp)e.hp=e.attr.maxhp
+					if(e.hp<1)then
+						del(tar_t.ents,e)
+					end
+				end
 			end
 			if(timer-self.w_stamp>30)then
 				a_st.g_off=a_st.shake
 				if(timer%2==0)a_st.shake=-a_st.shake
 			end
 			if(timer-self.w_stamp>50)then
+				printh('end time of wait','test')
 				a_st.g_off=0
-				local hs=a_st.hand.sel
-				local c=a_st.hand.cards[hs]
-				c.owner.anim:set('idle')
-				a_st.cont:set('sel_c')
+				cs.owner.anim:set('idle')
+				if(a_st.turn=='enemy')then
+					local active_e = false
+					for e in all(a_st.eg.ents)do
+						if(e.active)active_e=true
+					end
+					if(not active_e)then
+						for e in all(a_st.eg.ents)do
+							e.active=true
+						end
+					end
+					a_st.cont.st='sel_c'
+					a_st.turn='heroes'
+				else
+					local active_e = false
+					for e in all(a_st.pg.ents)do
+						if(e.active)active_e=true
+					end
+					if(not active_e)then
+						for e in all(a_st.pg.ents)do
+							e.active=true
+						end
+					end
+					local o=act_card.owner
+					del(a_st.hand.cards,act_card)
+					local new_c=pull_card(o.used_c,o.deck)
+					exam_tbl(o.deck[1])
+					add(a_st.hand.cards,{owner=o,card=o.deck[new_c]})
+					if(#o.used_c==#o.deck)then
+						o.used_c={}
+					end
+					a_st.turn='enemy'
+					self.w_stamp=timer
+				end
 				a_st.tar_t=nil
+				a_st.act_card=nil
 			end
 		end
+		
+		function sel_active_e(eg)
+			printh('sel_active_e','test')
+			local sel = flr(rnd(#eg.ents))+1
+			local e = eg.ents[sel]
+			if(not e.active) e = sel_active_e(eg)
+			return e
+		end
+		
+		function cont.st_conts:e_turn(a_st)
+			local e=sel_active_e(a_st.eg)
+			local cs=flr(rnd(#e.hand))+1
+			local	c=e.hand[cs]
+			if(c.card.ef=='atk')then
+				a_st.tar_t=a_st.pg
+			end
+			if(c.card.ef=='heal')then
+				a_st.tar_t=a_st.eg
+			end
+			if(c.card.ef=='move')then
+				local t=flr(rnd(2))					
+				a_st.tar_t=a_st.eg
+				if(t==1) a_st.tar_t=a_st.pg
+			end
+		end
+			--[x]select a random active enemy
+			--[x]select a random card they own
+			--if atk, target player
+			--if heal, target enemy
+			--if move, target random
+			--wait for effect
+			--run effect
+			--set all e to active if all
+			 --inactive
+			
+			
+			
+			
+--			if(timer-self.w_stamp==30)then
+--				sfx(-1,1)
+--				sfx(2)
+--				
+--				local hs=a_st.hand.sel
+--				local cs=a_st.hand.cards[hs]
+--				local tar_t=a_st.tar_t
+--				local tar_p=cs.card.tar
+--				local tar_e={}
+--				for e in all(tar_t.ents) do
+--					for p in all(tar_p) do
+--						if (e.pos==p.pos)then
+--							if(p.ef=='atk')then
+--								e.hp-=cs.owner.attr.atk
+--							end
+--							if(p.ef=='heal')then
+--								e.hp+=cs.owner.attr.heal
+--							end
+--							if(p.ef=='move')then
+--								local tp
+--								tp=nav_grid(p.dir,p.pos)
+--								local ok=true
+--								for et in all(tar_t.ents)do
+--									if(et.pos==tp) ok=false
+--								end
+--								if(ok)e.pos=tp
+--							end
+--						end
+--					end
+--					if(e.hp>e.attr.maxhp)e.hp=e.attr.maxhp
+--					if(e.hp<1)then
+--						del(tar_t.ents,e)
+--					end
+--				end
+--			end
+--			if(timer-self.w_stamp>30)then
+--				a_st.g_off=a_st.shake
+--				if(timer%2==0)a_st.shake=-a_st.shake
+--			end
+--			if(timer-self.w_stamp>50)then
+--				a_st.g_off=0
+--				local hs=a_st.hand.sel
+--				local c=a_st.hand.cards[hs]
+--				c.owner.anim:set('idle')
+--				a_st.cont:set('sel_c')
+--				a_st.tar_t=nil
+--			end
+--		end
 		
 		function	cont.st_conts:diag(a_st)
 --			local d = a_st.diag
@@ -1203,15 +1403,18 @@ function mk_grid(opt)
 		local sel_c
 		cards=a_st.hand.cards
 		sel_c=a_st.hand.sel
-		
+		local act_card = a_st.act_card
+		local pc=cards[sel_c]
 		if(is_tar)then
 			y=y-3
 			x+=a_st.g_off
 		end
 		draw_grid(x,y,is_tar)
 		draw_sel(x,y,sel)
-		if(is_tar and sel_c)then
-			for t in all(cards[sel_c].card.tar) do
+		local c = pc
+		if(act_card) c = act_card
+		if(is_tar and c)then
+			for t in all(c.card.tar) do
 				local s
 				local coord = g_pos_coord(x,y,t.pos)
 				if(t.ef=="atk")s=72
@@ -1340,7 +1543,6 @@ function g_pos_coord(x,y,pos)
 end
 
 function draw_card(x,y,c)
---	exam_tbl(card)
 	local c_color = 4
 	if(not c.owner.active) c_color=13
 	rectfill(x,y,x+34,y+40,c_color)
@@ -1402,7 +1604,6 @@ function mk_hand(p)
 	
 	local used_c={}
 	for m in all(p) do
---	exam_tbl(m)
 		for x=1, m.attr.hand do
 			local c = pull_card(used_c,#m.deck)
 			local hand_c={
@@ -1421,7 +1622,6 @@ function mk_hand(p)
 		local sel_x
 		
 		for i,c in ipairs(self.cards) do
---			exam_tbl(c)
 			local y = 105
 			if(self.sel==i)then
 			 sel_x=hand_x+(i-1)*10
@@ -1494,7 +1694,8 @@ function mk_c_party()
 		local attr={
 			maxhp=m.maxhp,
 			atk=m.atk,
-			hand=m.hand
+			hand=m.hand,
+			heal=m.heal
 		}
 		local c=m.c
 		local pos = fill_pos(filled_pos)
@@ -1514,6 +1715,7 @@ function mk_c_party()
 			hp=attr.maxhp,
 			pos=pos,
 			c=c,
+			used_c={},
 			active=true,
 			anim=mk_animator({
 				anim_tbl={
@@ -1548,7 +1750,6 @@ function mk_c_party()
 				}
 			})
 		}
-			exam_tbl(pm.attr)
 		
 		function pm:update()
 			self.anim:update()
@@ -1556,7 +1757,6 @@ function mk_c_party()
 		function pm:draw(x,y)
 			palt(0,false)
 			palt(2,true)
---			exam_tbl(self)	
 			local colo=self.c
 			if(not self.active)colo=13	
 			pal(12,colo)
@@ -1592,7 +1792,7 @@ function pull_card(c_tbl,deck_s)
 	end
 end
 
-function mk_e_party()
+function mk_e_party(opt)
 	local filled_pos={}
 	local party={
 		mk_robe(filled_pos),
@@ -1604,6 +1804,33 @@ function mk_e_party()
 end
 ---card effects, dmg, heal
 ---select target
+
+function nav_grid(dir,tar)
+ local end_p
+ if(dir==⬆️ and tar>3)then
+	 end_p=tar-3
+	end
+	if(dir==➡️)then
+		if(tar%3==0)then
+		else
+			end_p=tar+1
+		end
+	end
+	if(dir==⬇️ and tar<7)then
+		end_p=tar+3
+	end
+	if(dir==⬅️ and not(
+			tar==1
+			or tar==4
+			or tar==7
+		)
+	)then
+			end_p=tar-1
+	end
+	return end_p
+end
+
+
 -->8
 --combat entities
 
@@ -1621,6 +1848,7 @@ function mk_hero()
 		},
 --		hp=5,
 		hand=2,
+		heal=1,
 		atk=1,
 		maxhp=1,
 		c=12
@@ -1640,6 +1868,7 @@ function mk_healer()
 		},
 		hand=1,
 		atk=1,
+		heal=2,
 		maxhp=2,
 		c=3
 	}
@@ -1651,13 +1880,22 @@ function mk_betray()
 		name="oats, the betrayer",
 		desc="i would do it again",
 		eqp={
-			helm=helms.fool,
-			chest=chest_arm.routed,
-			bracers=bracers.scorned,
+			helm=helms.clear,
+			chest={
+				name='',
+				cards={	},
+				attr={ },
+			},
+			bracers={
+				name='',
+				cards={	},
+				attr={ },
+			},
 			grieves=grieves.exile	
 		},
 --		hp=5,
 		hand=1,
+		heal=0,
 		atk=2,
 		maxhp=1,
 		c=8
@@ -1669,16 +1907,20 @@ function mk_robe(pos_t)
 	local r={
 		name='robed blasphemy',
 		hp=3,
+		active=true,
+		used_c={},
 		deck={
-			raze_c,
-			raze_c,
-			raze_c
+			armag_c,
+			wheel_c,
+			punish_c,
+			patricide_c
 		},
 		attr={
 			maxhp=3,
 			hand=1,
 			atk=1,
 		},
+		hand={},
 		c=2,
 		pos=fill_pos(pos_t),
 		anim=mk_animator({
@@ -1693,19 +1935,46 @@ function mk_robe(pos_t)
 					 time=15
 					}
 				},
+				casting={
+					{
+						spr=128,
+						time=1
+					},
+					{
+					 spr=160,
+					 time=1
+					}
+				}
 			}
 		})
 	}
+	
+	function r:build_hand()
+		for n=#self.hand,self.attr.hand do
+			local used_c=self.used_c
+			local c = pull_card(used_c,self.deck)
+			local hand_c={
+				card=self.deck[c],
+				owner=self
+			}
+			add(r.hand,hand_c)		
+		end
+	end
 	
 	function r:update()
 		self.anim:update()
 	end
 	function r:draw(x,y)
 		palt(0,true)
+		if(not self.active) then
+			pal(2,1)
+		end
 		self.anim:draw(x,y,false,2,2)
+		pal(2,2)
 		palt(0,false)
 	end
 	
+	r:build_hand()
 	return r
 end
 
@@ -1763,7 +2032,52 @@ scatter_c={
 	}
 }
 
-	
+armag_c={
+	title="ENDTIMES",
+	tar={
+		{pos=1,ef='atk'},
+		{pos=2,ef='atk'},
+		{pos=3,ef='atk'},
+		{pos=4,ef='atk'},
+		{pos=5,ef='atk'},
+		{pos=6,ef='atk'},
+		{pos=7,ef='atk'},
+		{pos=8,ef='atk'},
+		{pos=9,ef='atk'},
+	}	
+}
+
+pat_c={
+	title='PATRICIDE',
+	tar={
+		{pos=5,ef='atk'}
+	}
+}
+
+wheel_c={
+	title="WHEEL",
+	tar={
+		{pos=1,ef="atk"},
+		{pos=2,ef="heal"},
+		{pos=3,ef="move",dir=⬇️},
+		{pos=4,ef="move",dir=⬆️},
+		{pos=6,ef="move",dir=⬇️},
+		{pos=7,ef="move",dir=⬆️},
+		{pos=8,ef="move",dir=⬅️},
+		{pos=9,ef="move",dir=⬅️},
+	}
+}
+
+marked_c={
+	title="MARKED",
+	tar={
+		{pos=1,ef="atk"},
+		{pos=3,ef="atk"},
+		{pos=5,ef="atk"},
+		{pos=7,ef="atk"},
+		{pos=9,ef="atk"},
+	}
+}
 	
 --bracers of the forsaker
 --UNGOD
@@ -1778,6 +2092,20 @@ helms={
 			maxhp=1,
 --			hand=-1
 		}
+	},
+	clear={
+		name='helm of clarity',
+		cards={
+			wheel_c,
+			punish_c,
+			patricide_c,
+			armag_c,
+		},
+		attr={
+			atk=3,
+			maxhp=20,
+			hand=5
+		}
 	}
 }
 
@@ -1789,7 +2117,8 @@ chest_arm={
 			beg_c
 		},
 		attr={
-			maxhp=1
+			maxhp=1,
+			heal=1
 		}
 	}
 }
@@ -1899,6 +2228,22 @@ __gfx__
 0002222222222000002222222222220022222dcccccd222200000000000000000000000000000000000000000000000000000000000000000000000000000000
 0002222222222000002222222222220022222e2ddd2e222200000000000000000000000000000000000000000000000000000000000000000000000000000000
 0002222222222000002222222222220022222e22222e222200000000000000000000000000000000000000000000000000000000000000000000000000000000
+00000099990000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+00000922229000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+00009222222900000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+00009221222900000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+00092212122290000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+00092222222290000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+00929999999229000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+00929999999929000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+09290222222092900000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+09900222222009900000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+00000222222000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+00000222222000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+00000222222000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+00000222222000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+00000222222000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+00000222222000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 __label__
 88888888888888888888888888888888888888888888888888888888888888888888888888888888888888888888888888888888888888888888888888888888
 88888eeeeee888777777888eeeeee888eeeeee888888888888888888888888888888888888888888888ff8ff8888228822888222822888888822888888228888
