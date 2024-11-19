@@ -36,625 +36,6 @@ __lua__
 --equipment
 
 -->8
---life cycle functions
-
-function _init()
-	printh('','test',true)
-	timer=1
-	app_state = mk_title_st()
-end
-
-function _update()
- 	timer+=1
-	app_state:update()
-end
-
-function _draw()
-	cls()
-	app_state:draw()
-end
--->8
---title state
-
-function mk_title_st() 
-	local st = {} --state
-	
-	st.title={	
-		txt={"porkronymus bosch"},
-		draw=function(self)
-		 local txt=self.txt
-			local tp
-			tp=cent_txt_tbl_pos(txt)
-			for i,l in ipairs(tp) do
-				print(txt[i],l[1],l[2])
-			end
-		end
-	}
-	
-	st.ins={--instructions
-		w=96,
-		h=20,
-		y=88,
-		txt="press ❎ to start",
-		get_x=function(s)
-			return cent_box(s.w,s.h)[1]
-		end,
-		get_t_pos=function(s)
-			return cent_txt_pos(s.txt,{
-				x=s:get_x(),
-				y=s.y,
-				w=s.w,
-				h=s.h
-			})
-		end,
-		draw=function(s)
-			local ex=s:get_x()+s.w
-			local ey=s.y+s.h
-			local t_pos=s:get_t_pos()
-			rect(s:get_x(),s.y,ex,ey)
-			print(s.txt,t_pos[1],t_pos[2])
-		end
-	}
-	
-	function	st:update()
-		if(btnp(❎))then
-			app_state=mk_active_g_st()
-		end
-	end
-	
-	function st:draw()
-		self.title:draw()
-		self.ins:draw()
-	end
-
-	return st
-end
--->8
---active game state
-
-function mk_active_g_st()
-	local st = {}
-	st.screen_st=mk_explore_st()
-	st.party={
-		{
-			ch=pork_ch,
-			eqp={
-				helm=helms.fool,
-				chest=chest_arm.routed,
-				bracers=bracers.scorned,
-				grieves=grieves.exile	
-			}
-		},
-		{
-			ch=father_ch,
-			eqp={
-				helm=helms.fool,
-				chest=chest_arm.routed,
-				bracers=bracers.scorned,
-				grieves=grieves.exile	
-			}
-		},
-		{
-			ch=betrayer_ch,
-			eqp={
-				helm=helms.clear,
-				chest={
-					name='',
-					cards={	},
-					attr={ },
-				},
-				bracers={
-					name='',
-					cards={	},
-					attr={ },
-				},
-				grieves=grieves.exile	
-			}
-		}
-	}
-	
-	function st:update()
-		st.screen_st:update()
-	end
-	
-	function st:draw()
-		st.screen_st:draw()	
-	end
-	
-	return st
-end
--->8
---explore state
-
-function mk_explore_st()
-	local st={}
-	st.rooms=mk_rooms()
-	st.cur_r=1 --current room
-	st.p=mk_player(30,30)
-	
-	function st:get_cur_room()
-		return self.rooms[self.cur_r]
-	end
-	
-	function st:update()
-		local room
-		room = self:get_cur_room()
-
-		self:handle_inputs()
-		room:update()
-		self.p:update(room)
-		self:handle_doors()
-	end
-	
-	function st:draw()
-		local room
-		room = self:get_cur_room()
-		room:draw()
-		self.p:draw(room)
-		if(self.diag)then
-			self.diag:draw()
-		end
-		room = self:get_cur_room()
-	end
-	
-	function st:handle_doors()
-		local room
-		local p = self.p
-		local ec = p:engage_col()
-		room = self:get_cur_room()
-		for door in all(room.doors)do
-			if(colliding(door.col,ec))then
-				local p_start
-				local tar_ent
-				local cur_r
-				self.cur_r=door.dest.room_id
-				tar_r=self:get_cur_room()
-				tar_ent_id=door.dest.door --target entrance
-				tar_ent=tar_r.doors[tar_ent_id]
-				p_start=tar_ent.get_ent_pos(p)
-				self.p.x=p_start[1]
-				self.p.y=p_start[2]
-			end
-		end
-	end
-	
-	function st:handle_inputs()
-		self.controller:update(self)
-	end
-
-	function st.mk_explore_cont()
-		local cont={
-			st='walk',
-			st_conts={}
-		}
-		function cont:set(st)
-			if(self.st!=st)then
-				self.st=st
-			end
-		end
-		
-		function cont:update(a_st)
-			local cont 
-			cont=self.st_conts[self.st]
-			cont(self,a_st)
-		end
-
-		function cont.st_conts:walk(a_st)
-			local p = a_st.p
-			local r=a_st:get_cur_room()
-			local moving = false
-			if(btn(⬆️))then
-				p:move(⬆️)
-				moving=true
-			end
-			if(btn(➡️))then
-				p:move(➡️)
-				moving=true	
-			end
-			if(btn(⬇️))then
-				p:move(⬇️)
-				moving=true
-			end
-			if(btn(⬅️))then
-				p:move(⬅️)
-				moving=true
-			end
-			if(btnp(🅾️))then
-				local ec=p:engage_col()
-				for npc in all(r.npcs) do
-					if(colliding(npc:col(),ec))then
-						self:set("diag")
-						a_st.diag=mk_diag(p,npc.txt)
-					end
-				end
-			end
-			if(btnp(❎))then
-				app_state.screen_st=mk_combat_st()
-			end
-			if(moving)then
-				p.st='walk'
-			else
-				p.st='idle'
-			end
-		end
-		
-		function	cont.st_conts:diag(a_st)
-			local d = a_st.diag
-			if(btnp(🅾️)) d.cur+=1
-			if(d.cur>#d.txt)then
-				cont:set('walk')
-				a_st.diag=nil
-			end
-		end		
-		return cont
-	end
-	
-	st.controller=st:mk_explore_cont()
-
-	return st
-end
-
-function mk_rooms(p)
-	local rooms = {}
-	rooms[1]=mk_room({
-		map_id=0,
-		doors={
-		 {
-			col={
-				134,
-				48,
-				136,
-				64
-			},
-			dest={
-				room_id=2,
-				door=1
-			},
-			get_ent_pos=function(p)--entrance position
-				return{126, p.y}
-			end
-		}
-		},
-		npcs={
-			mk_cloak_npc({
-				x=8,
-				y=16,
-				txt={
-					{
-						'i never tell the truth'
-					}
-				}
-			}),
-			mk_cloak_npc({
-				x=8,
-				y=76,
-				txt={
-					{
-						'i always tell lies'
-					}
-				}
-			})
-		}
-	})
-	
-	rooms[2]=mk_room({
-		map_id=1,
-		doors={
-			{
-				col={
-					-6,
-					48,
-					-8,
-					64
-				},
-				dest={
-					room_id=1,
-					door=1
-				},
-				get_ent_pos=function(p)--entrance position
-					return {-4, p.y}
-				end
-			}
-		},
-		npcs={
-			mk_cloak_npc({
-			 x=80,
-			 y=24,
-			 txt={
-			 	{
-			 		"can you feel the rot",
-			 		"in your eyes?"
-			 	}
-			 },
-			 left=true
-			})
-		}
-	})
-		
-	return rooms
-end
-
-function map_walls(map_id)
-	local walls={}
-	local off = map_id*16
-	for y=0,16 do
-		for x=0,16 do
-			local mt=mget(x+off,y)
-			if(fget(mt,0))then
-				sx=x*8
-				sy=y*8
-				local wall={sx,sy,sx+7,sy+7}
-				add(walls,wall)
-			end
-		end
-	end
-	
-	return walls
-end
-
-function mk_room(opt)
-	local r = {}
-	local map_id=opt.map_id
-	local npcs=opt.npcs or {}
-	r.map_id=map_id
-	r.npcs=npcs
-	r.walls={}
-	r.npc_cols={}
-	r.doors=opt.doors or {}
-	
-	local m_walls=map_walls(map_id)
-	copy_tbl_into(m_walls,r.walls)
-	
-	local npc_cols={}
-	for npc in all(npcs) do
-		add(npc_cols,npc:col())
-	end
-	
-	r.npc_cols=npc_cols
-	copy_tbl_into(npc_cols,r.walls)
-
-	function r:update()
-		for npc in all(r.npcs) do
-			npc:update()
-		end
-	end
-	
-	function r:draw()
-		local x = self.map_id*16
-		map(x,0)
-		for npc in all(r.npcs) do
-			npc:draw()
-		end
-	end
-	
-	return r
-end
-
-function get_map_flags(map_id)
-	local offset=map_id*16
-	for y=0,16 do
-		for x=0,16 do
-		 local m_tile
-		 m_tile=mget(x+offset,y+offset)
-			
-		end
-	end
-end
--->8
---explore entities
-
-function mk_player(x,y)
-	local speed=1
-	local p = {
-		st='idle',
-		x=x,
-		y=y,
-		right=false,
-		anim=mk_animator({
-			anim_tbl={
-				idle={
-					{
-						spr=4,
-						time=10
-					},
-					{
-					 spr=7,
-					 time=15
-					}
-				},
-				walk={
-					{
-						spr=4,
-						time=5
-					},
-					{
-					 spr=5,
-					 time=2,
-					},
-					{
-					 spr=4,
-					 time=5
-					},
-					{
-					 spr=6,
-					 time=2
-					}
-				}
-			}
-		})
-	}
-	
-	function p:move(dir)
-		if(dir==⬆️)then
-			p.y-=speed
-		end
-		if(dir==➡️)then
-			p.x+=speed
-			p.right=true
-		end
-		if(dir==⬇️)then
-			p.y+=speed
-		end
-		if(dir==⬅️)then
-			p.x-=speed
-			p.right=false
-		end
-	end
-	
-	function p:r_col()
-		return {
-			self.x+6,
-			self.y+3,
-			self.x+7,
-			self.y+4
-		}
-	end
-	
-	function p:d_col()
-		return {
-			self.x+3,
-			self.y+6,
-			self.x+4,
-			self.y+7
-		}
-	end
-	
-	function p:l_col()
-		return {
-			self.x,
-			self.y+3,
-			self.x+1,
-			self.y+4
-		}
-	end
-
-	function p:u_col()
-		return {
-			self.x+3,
-			self.y,
-			self.x+4,
-			self.y+1
-		}
-	end
-	
-	function p:engage_col()
-		return {
-			self.x-1,
-			self.y-1,
-			self.x+8,
-			self.y+8
-		}
-	end
-	
-	function p:nearby_walls(room)
-		local walls = {}
-		local m_id=room.map_id
-		local offset=m_id*16
-		local mfx=flr(self.x/8)
-		local mfy=flr(self.y/8)
-		local mcx=ceil(self.x/8)
-		local mcy=ceil(self.y/8)
---		rect(mx*8,my*8,mx*8+8,my*8+8)
-	 local	mfs=mget(mfx,mfy)
-	 local	mcs=mget(mcx,mcy)
-	 local mff=fget(mfs,0)
-	 local mcf=fget(mcs,0)
-	 if(mff)add(walls,{mfx*8,mfy*8})
-	 if(mcf)add(walls,{mcx*8,mcy*8})
-	 
-	 return walls
-	end
-
-	function p:handle_col(r)
-	 	
-	 for w_col in all (r.walls) do
-		 if(colliding(self:u_col(),w_col))
-		 then self.y=w_col[4]+1
-		 end
-		 if(colliding(self:r_col(),w_col))
-		 then self.x=w_col[1]-8
-		 end
-		 if(colliding(self:d_col(),w_col))
-		 then self.y=w_col[2]-8
-		 end
-		 if(colliding(self:l_col(),w_col))
-		 then self.x=w_col[3]+1
-		 end
-	 end
-	end
-	
-	function p:update(room)
-		self:handle_col(room)
-		p.anim:set(p.st)
-		p.anim:update()
-	end
-	
-	function p:draw(room)
---		for r in all(room.walls) do
---			rect(r[1],r[2],r[3],r[4],7)
---		end
---		local uc=self:u_col()
---		local rc=self:r_col()
---		local dc=self:d_col()
---		local lc=self:l_col()
---		rect(uc[1],uc[2],uc[3],uc[4],7)
---		rect(rc[1],rc[2],rc[3],rc[4],9)
---		rect(dc[1],dc[2],dc[3],dc[4],10)
---		rect(lc[1],lc[2],lc[3],lc[4],11)
-		self.anim:draw(self.x,self.y,self.right)
-	end
-	
-	return p
-end
-
-
-function mk_cloak_npc(opt)
-	local npc={
-		x=opt.x,
-		y=opt.y,
-		txt=opt.txt or {},
-		left=opt.left
-	}
-
-	function npc:col()
-		return {
-			npc.x,
-			npc.y,
-			npc.x+7,
-			npc.y+7
-		}
-	end
-	
-	local ani_opt={
-		anim_tbl={
-			idle={
-				{
-					spr=2,
-					time=15
-				},
-				{
-				 spr=3,
-				 time=10
-			 }
-			}
-		},
-		state='idle'
-	}
-	
-	npc.anim=mk_animator(ani_opt)
-	
-	function npc:update()
-		self.anim:update()
-			
-	end
-	
-	function npc:draw()
-		self.anim:draw(self.x,self.y,self.left)
-	end
-	
-	return npc
-end
--->8
 --utilities
 
 
@@ -993,6 +374,633 @@ function exam_tbl(tbl)
 		printh(v,'test2')
 	end
 end
+
+-->8
+--life cycle functions
+
+function _init()
+	printh('','test',true)
+	timer=1
+	app_state = mk_title_st()
+end
+
+function _update()
+ 	timer+=1
+	app_state:update()
+end
+
+function _draw()
+	cls()
+	app_state:draw()
+end
+
+-->8
+--title state
+
+function mk_title_st() 
+	local st = {} --state
+	
+	st.title={	
+		txt={"porkronymus bosch"},
+		draw=function(self)
+		 local txt=self.txt
+			local tp
+			tp=cent_txt_tbl_pos(txt)
+			for i,l in ipairs(tp) do
+				print(txt[i],l[1],l[2])
+			end
+		end
+	}
+	
+	st.ins={--instructions
+		w=96,
+		h=20,
+		y=88,
+		txt="press ❎ to start",
+		get_x=function(s)
+			return cent_box(s.w,s.h)[1]
+		end,
+		get_t_pos=function(s)
+			return cent_txt_pos(s.txt,{
+				x=s:get_x(),
+				y=s.y,
+				w=s.w,
+				h=s.h
+			})
+		end,
+		draw=function(s)
+			local ex=s:get_x()+s.w
+			local ey=s.y+s.h
+			local t_pos=s:get_t_pos()
+			rect(s:get_x(),s.y,ex,ey)
+			print(s.txt,t_pos[1],t_pos[2])
+		end
+	}
+	
+	function	st:update()
+		if(btnp(❎))then
+			app_state=mk_active_g_st()
+		end
+	end
+	
+	function st:draw()
+		self.title:draw()
+		self.ins:draw()
+	end
+
+	return st
+end
+-->8
+--active game state
+
+function mk_active_g_st()
+	local st = {}
+	st.screen_st=mk_explore_st()
+	st.party={
+		{
+			ch=pork_ch,
+			eqp={
+				helm=helms.fool,
+				chest=chest_arm.routed,
+				bracers=bracers.scorned,
+				grieves=grieves.exile	
+			}
+		},
+		{
+			ch=father_ch,
+			eqp={
+				helm=helms.fool,
+				chest=chest_arm.routed,
+				bracers=bracers.scorned,
+				grieves=grieves.exile	
+			}
+		},
+		{
+			ch=betrayer_ch,
+			eqp={
+				helm=helms.clear,
+				chest={
+					name='',
+					cards={	},
+					attr={ },
+				},
+				bracers={
+					name='',
+					cards={	},
+					attr={ },
+				},
+				grieves=grieves.exile	
+			}
+		}
+	}
+	
+	function st:update()
+		st.screen_st:update()
+	end
+	
+	function st:draw()
+		st.screen_st:draw()	
+	end
+	
+	return st
+end
+-->8
+--explore state
+
+function mk_explore_st()
+	local st={}
+	st.rooms=mk_rooms()
+	st.cur_r=1 --current room
+	st.p=mk_player(30,30)
+	
+	function st:get_cur_room()
+		return self.rooms[self.cur_r]
+	end
+	
+	function st:update()
+		local room
+		room = self:get_cur_room()
+
+		self:handle_inputs()
+		room:update()
+		self.p:update(room)
+		self:handle_doors()
+	end
+	
+	function st:draw()
+		local room
+		room = self:get_cur_room()
+		room:draw()
+		self.p:draw(room)
+		if(self.diag)then
+			self.diag:draw()
+		end
+		room = self:get_cur_room()
+	end
+	
+	function st:handle_doors()
+		local room
+		local p = self.p
+		local ec = p:engage_col()
+		room = self:get_cur_room()
+		for door in all(room.doors)do
+			if(colliding(door.col,ec))then
+				local p_start
+				local tar_ent
+				local cur_r
+				self.cur_r=door.dest.room_id
+				tar_r=self:get_cur_room()
+				tar_ent_id=door.dest.door --target entrance
+				tar_ent=tar_r.doors[tar_ent_id]
+				p_start=tar_ent.get_ent_pos(p)
+				self.p.x=p_start[1]
+				self.p.y=p_start[2]
+			end
+		end
+	end
+	
+	function st:handle_inputs()
+		self.controller:update(self)
+	end
+
+	function st.mk_explore_cont()
+		local cont={
+			st='walk',
+			st_conts={}
+		}
+		function cont:set(st)
+			if(self.st!=st)then
+				self.st=st
+			end
+		end
+		
+		function cont:update(a_st)
+			local cont 
+			cont=self.st_conts[self.st]
+			cont(self,a_st)
+		end
+
+		function cont.st_conts:walk(a_st)
+			local p = a_st.p
+			local r=a_st:get_cur_room()
+			local moving = false
+			if(btn(⬆️))then
+				p:move(⬆️)
+				moving=true
+			end
+			if(btn(➡️))then
+				p:move(➡️)
+				moving=true	
+			end
+			if(btn(⬇️))then
+				p:move(⬇️)
+				moving=true
+			end
+			if(btn(⬅️))then
+				p:move(⬅️)
+				moving=true
+			end
+			if(btnp(🅾️))then
+				local ec=p:engage_col()
+				for npc in all(r.npcs) do
+					if(colliding(npc:col(),ec))then
+						self:set("diag")
+						a_st.diag=mk_diag(p,npc.txt)
+					end
+				end
+			end
+			if(btnp(❎))then
+				app_state.screen_st=mk_combat_st()
+			end
+			if(moving)then
+				p.st='walk'
+			else
+				p.st='idle'
+			end
+		end
+		
+		function	cont.st_conts:diag(a_st)
+			local d = a_st.diag
+			if(btnp(🅾️)) d.cur+=1
+			if(d.cur>#d.txt)then
+				cont:set('walk')
+				a_st.diag=nil
+			end
+		end		
+		return cont
+	end
+	
+	st.controller=st:mk_explore_cont()
+
+	return st
+end
+
+function mk_rooms(p)
+	local rooms = {}
+	for i,def in ipairs(room_defs)do
+		rooms[i]=mk_room(def)
+	end
+		
+	return rooms
+end
+
+function map_walls(map_id)
+	local walls={}
+	local off = map_id*16
+	for y=0,16 do
+		for x=0,16 do
+			local mt=mget(x+off,y)
+			if(fget(mt,0))then
+				sx=x*8
+				sy=y*8
+				local wall={sx,sy,sx+7,sy+7}
+				add(walls,wall)
+			end
+		end
+	end
+	
+	return walls
+end
+
+function mk_room(opt)
+	local r = {}
+	local map_id=opt.map_id
+	local npcs=opt.npcs or {}
+	r.map_id=map_id
+	r.npcs=npcs
+	r.walls={}
+	r.npc_cols={}
+	r.doors=opt.doors or {}
+	
+	local m_walls=map_walls(map_id)
+	copy_tbl_into(m_walls,r.walls)
+	
+	local npc_cols={}
+	for npc in all(npcs) do
+		add(npc_cols,npc:col())
+	end
+	
+	r.npc_cols=npc_cols
+	copy_tbl_into(npc_cols,r.walls)
+
+	function r:update()
+		for npc in all(r.npcs) do
+			npc:update()
+		end
+	end
+	
+	function r:draw()
+		local x = self.map_id*16
+		map(x,0)
+		for npc in all(r.npcs) do
+			npc:draw()
+		end
+	end
+	
+	return r
+end
+
+function get_map_flags(map_id)
+	local offset=map_id*16
+	for y=0,16 do
+		for x=0,16 do
+		 local m_tile
+		 m_tile=mget(x+offset,y+offset)
+			
+		end
+	end
+end
+-->8
+--explore entities
+
+function mk_player(x,y)
+	local speed=1
+	local p = {
+		st='idle',
+		x=x,
+		y=y,
+		right=false,
+		anim=mk_animator({
+			anim_tbl={
+				idle={
+					{
+						spr=4,
+						time=10
+					},
+					{
+					 spr=7,
+					 time=15
+					}
+				},
+				walk={
+					{
+						spr=4,
+						time=5
+					},
+					{
+					 spr=5,
+					 time=2,
+					},
+					{
+					 spr=4,
+					 time=5
+					},
+					{
+					 spr=6,
+					 time=2
+					}
+				}
+			}
+		})
+	}
+	
+	function p:move(dir)
+		if(dir==⬆️)then
+			p.y-=speed
+		end
+		if(dir==➡️)then
+			p.x+=speed
+			p.right=true
+		end
+		if(dir==⬇️)then
+			p.y+=speed
+		end
+		if(dir==⬅️)then
+			p.x-=speed
+			p.right=false
+		end
+	end
+	
+	function p:r_col()
+		return {
+			self.x+6,
+			self.y+3,
+			self.x+7,
+			self.y+4
+		}
+	end
+	
+	function p:d_col()
+		return {
+			self.x+3,
+			self.y+6,
+			self.x+4,
+			self.y+7
+		}
+	end
+	
+	function p:l_col()
+		return {
+			self.x,
+			self.y+3,
+			self.x+1,
+			self.y+4
+		}
+	end
+
+	function p:u_col()
+		return {
+			self.x+3,
+			self.y,
+			self.x+4,
+			self.y+1
+		}
+	end
+	
+	function p:engage_col()
+		return {
+			self.x-1,
+			self.y-1,
+			self.x+8,
+			self.y+8
+		}
+	end
+	
+	function p:nearby_walls(room)
+		local walls = {}
+		local m_id=room.map_id
+		local offset=m_id*16
+		local mfx=flr(self.x/8)
+		local mfy=flr(self.y/8)
+		local mcx=ceil(self.x/8)
+		local mcy=ceil(self.y/8)
+--		rect(mx*8,my*8,mx*8+8,my*8+8)
+		local	mfs=mget(mfx,mfy)
+		local	mcs=mget(mcx,mcy)
+		local mff=fget(mfs,0)
+		local mcf=fget(mcs,0)
+		if(mff)add(walls,{mfx*8,mfy*8})
+		if(mcf)add(walls,{mcx*8,mcy*8})
+	 
+	 	return walls
+	end
+
+	function p:handle_col(r)
+	 for w_col in all (r.walls) do
+		 if(colliding(self:u_col(),w_col))
+		 then self.y=w_col[4]+1
+		 end
+		 if(colliding(self:r_col(),w_col))
+		 then self.x=w_col[1]-8
+		 end
+		 if(colliding(self:d_col(),w_col))
+		 then self.y=w_col[2]-8
+		 end
+		 if(colliding(self:l_col(),w_col))
+		 then self.x=w_col[3]+1
+		 end
+	 end
+	end
+	
+	function p:update(room)
+		self:handle_col(room)
+		p.anim:set(p.st)
+		p.anim:update()
+	end
+	
+	function p:draw(room)
+--		for r in all(room.walls) do
+--			rect(r[1],r[2],r[3],r[4],7)
+--		end
+--		local uc=self:u_col()
+--		local rc=self:r_col()
+--		local dc=self:d_col()
+--		local lc=self:l_col()
+--		rect(uc[1],uc[2],uc[3],uc[4],7)
+--		rect(rc[1],rc[2],rc[3],rc[4],9)
+--		rect(dc[1],dc[2],dc[3],dc[4],10)
+--		rect(lc[1],lc[2],lc[3],lc[4],11)
+		self.anim:draw(self.x,self.y,self.right)
+	end
+	
+	return p
+end
+
+
+function mk_cloak_npc(opt)
+	local npc={
+		x=opt.x,
+		y=opt.y,
+		txt=opt.txt or {},
+		left=opt.left
+	}
+
+	function npc:col()
+		return {
+			npc.x,
+			npc.y,
+			npc.x+7,
+			npc.y+7
+		}
+	end
+	
+	local ani_opt={
+		anim_tbl={
+			idle={
+				{
+					spr=2,
+					time=15
+				},
+				{
+				 spr=3,
+				 time=10
+			 }
+			}
+		},
+		state='idle'
+	}
+	
+	npc.anim=mk_animator(ani_opt)
+	
+	function npc:update()
+		self.anim:update()
+			
+	end
+	
+	function npc:draw()
+		self.anim:draw(self.x,self.y,self.left)
+	end
+	
+	return npc
+end
+
+room_defs={}
+
+room_defs[1]={
+	map_id=0,
+	doors={
+		{
+		col={
+			134,
+			48,
+			136,
+			64
+		},
+		dest={
+			room_id=2,
+			door=1
+		},
+		get_ent_pos=function(p)--entrance position
+			return{126, p.y}
+		end
+	}
+	},
+	npcs={
+		mk_cloak_npc({
+			x=8,
+			y=16,
+			txt={
+				{
+					'i never tell the truth'
+				}
+			}
+		}),
+		mk_cloak_npc({
+			x=8,
+			y=76,
+			txt={
+				{
+					'i always tell lies'
+				}
+			}
+		})
+	}
+}
+
+room_defs[2]={
+	map_id=1,
+	doors={
+		{
+			col={
+				-6,
+				48,
+				-8,
+				64
+			},
+			dest={
+				room_id=1,
+				door=1
+			},
+			get_ent_pos=function(p)--entrance position
+				return {-4, p.y}
+			end
+		}
+	},
+	npcs={
+		mk_cloak_npc({
+		 x=80,
+		 y=24,
+		 txt={
+			 {
+				 "can you feel the rot",
+				 "in your eyes?"
+			 }
+		 },
+		 left=true
+		})
+	}
+}
+
 -->8
 --type def
 
