@@ -205,8 +205,13 @@ function mk_explore_st()
 		for door in all(room.doors)do
 			if(colliding(door.col,ec))then
 				local p_start
+				local tar_ent
+				local cur_r
 				self.cur_r=door.dest.room_id
-				p_start=door.dest.p_start(p)
+				tar_r=self:get_cur_room()
+				tar_ent_id=door.dest.door --target entrance
+				tar_ent=tar_r.doors[tar_ent_id]
+				p_start=tar_ent.get_ent_pos(p)
 				self.p.x=p_start[1]
 				self.p.y=p_start[2]
 			end
@@ -295,19 +300,20 @@ function mk_rooms(p)
 		map_id=0,
 		doors={
 		 {
-				col={
-					134,
-					48,
-					136,
-					64
-				},
-				dest={
-					room_id=2,
-					p_start=function(p)
-						return {0,p.y}
-					end
-				}
-			}
+			col={
+				134,
+				48,
+				136,
+				64
+			},
+			dest={
+				room_id=2,
+				door=1
+			},
+			get_ent_pos=function(p)--entrance position
+				return{126, p.y}
+			end
+		}
 		},
 		npcs={
 			mk_cloak_npc({
@@ -343,10 +349,11 @@ function mk_rooms(p)
 				},
 				dest={
 					room_id=1,
-					p_start=function(p)
-						return {124,p.y}
-					end
-				}
+					door=1
+				},
+				get_ent_pos=function(p)--entrance position
+					return {-4, p.y}
+				end
 			}
 		},
 		npcs={
