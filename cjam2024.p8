@@ -177,9 +177,10 @@ function mk_explore_st()
 	end
 	
 	function st:update()
-		self:handle_inputs()
 		local room
 		room = self:get_cur_room()
+
+		self:handle_inputs()
 		room:update()
 		self.p:update(room)
 		self:handle_doors()
@@ -203,9 +204,8 @@ function mk_explore_st()
 		room = self:get_cur_room()
 		for door in all(room.doors)do
 			if(colliding(door.col,ec))then
-				print('bbbbb')
-				self.cur_r=door.dest.room_id
 				local p_start
+				self.cur_r=door.dest.room_id
 				p_start=door.dest.p_start(p)
 				self.p.x=p_start[1]
 				self.p.y=p_start[2]
@@ -234,9 +234,9 @@ function mk_explore_st()
 			cont(self,a_st)
 		end
 
-		function	cont.st_conts:walk(a_st)
+		function cont.st_conts:walk(a_st)
 			local p = a_st.p
-			local r=a_st.rooms[a_st.cur_r]
+			local r=a_st:get_cur_room()
 			local moving = false
 			if(btn(⬆️))then
 				p:move(⬆️)
