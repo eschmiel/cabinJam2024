@@ -22,7 +22,7 @@ __lua__
 ---[x]transitions
 --combat state
 ---[x]player grid, enemy grid
----turns
+---[x]turns
 ---[x]select card
 ---[x]select target
 ---[x]cards, random draw
@@ -45,7 +45,7 @@ function _init()
 end
 
 function _update()
- timer+=1
+ 	timer+=1
 	app_state:update()
 end
 
@@ -59,12 +59,7 @@ end
 function mk_title_st() 
 	local st = {} --state
 	
-	st.title={
---		txt={
---			"cabin jam 2024 project",
---			"bingo",
---			"jammo"
---		},		
+	st.title={	
 		txt={"porkronymus bosch"},
 		draw=function(self)
 		 local txt=self.txt
@@ -121,9 +116,41 @@ function mk_active_g_st()
 	local st = {}
 	st.screen_st=mk_explore_st()
 	st.party={
-		mk_hero(),
-		mk_healer(),
-		mk_betray()
+		{
+			ch=pork_ch,
+			eqp={
+				helm=helms.fool,
+				chest=chest_arm.routed,
+				bracers=bracers.scorned,
+				grieves=grieves.exile	
+			}
+		},
+		{
+			ch=father_ch,
+			eqp={
+				helm=helms.fool,
+				chest=chest_arm.routed,
+				bracers=bracers.scorned,
+				grieves=grieves.exile	
+			}
+		},
+		{
+			ch=betrayer_ch,
+			eqp={
+				helm=helms.clear,
+				chest={
+					name='',
+					cards={	},
+					attr={ },
+				},
+				bracers={
+					name='',
+					cards={	},
+					attr={ },
+				},
+				grieves=grieves.exile	
+			}
+		}
 	}
 	
 	function st:update()
@@ -1689,15 +1716,17 @@ function mk_c_party()
 	
 	local filled_pos={}
 	for m in all(party) do
-		local name=m.name
+		exam_tbl(party[3])
+		local ch = m.ch
+		local name=ch.name
 		local deck={}
 		local attr={
-			maxhp=m.maxhp,
-			atk=m.atk,
-			hand=m.hand,
-			heal=m.heal
+			maxhp=ch.maxhp,
+			atk=ch.atk,
+			hand=ch.hand,
+			heal=ch.heal
 		}
-		local c=m.c
+		local c=ch.c
 		local pos = fill_pos(filled_pos)
 		
 		for e_name,e in pairs(m.eqp) do
@@ -1834,74 +1863,44 @@ end
 -->8
 --combat entities
 
---function mk_c
 
-function mk_hero()
-	local h={
-		name="porkronymus bosch",
-		desc="i have been told i am a failure",
-		eqp={
-			helm=helms.fool,
-			chest=chest_arm.routed,
-			bracers=bracers.scorned,
-			grieves=grieves.exile	
-		},
---		hp=5,
-		hand=2,
-		heal=1,
-		atk=1,
-		maxhp=1,
-		c=12
-	}
-	return h
-end
+----- characters -----
 
-function mk_healer()
-	local h={
-		name="father hock",
-		desc="i abandoned my duty",
-		eqp={
-			helm=helms.fool,
-			chest=chest_arm.routed,
-			bracers=bracers.scorned,
-			grieves=grieves.exile	
-		},
-		hand=1,
-		atk=1,
-		heal=2,
-		maxhp=2,
-		c=3
-	}
-	return h
-end
 
-function mk_betray()
-	local h={
-		name="oats, the betrayer",
-		desc="i would do it again",
-		eqp={
-			helm=helms.clear,
-			chest={
-				name='',
-				cards={	},
-				attr={ },
-			},
-			bracers={
-				name='',
-				cards={	},
-				attr={ },
-			},
-			grieves=grieves.exile	
-		},
---		hp=5,
-		hand=1,
-		heal=0,
-		atk=2,
-		maxhp=1,
-		c=8
+pork_ch= {
+	name="porkronymus bosch",
+	desc="i have been told i am a failure",
+	hand=2,
+	heal=1,
+	atk=1,
+	maxhp=1,
+	c=12
 	}
-	return h
-end
+
+
+father_ch={
+	name="father hock",
+	desc="i abandoned my duty",
+	hand=1,
+	atk=1,
+	heal=2,
+	maxhp=2,
+	c=3
+}
+
+betrayer_ch={
+	name="oats, the betrayer",
+	desc="i would do it again",
+	hand=1,
+	heal=0,
+	atk=2,
+	maxhp=1,
+	c=8
+}
+
+
+----- enemies -----
+
 
 function mk_robe(pos_t)
 	local r={
