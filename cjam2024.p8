@@ -39,7 +39,7 @@ __lua__
 --life cycle functions
 
 function _init()
-	printh('','test',true)
+	printh('','logs/test',true)
 	timer=1
 	app_state = mk_title_st()
 end
@@ -1021,10 +1021,10 @@ end
 
 
 function exam_tbl(tbl)
-	printh('start','test2',true)
+	printh('start','logs/test2',true)
 	for k,v in pairs(tbl)do
-		printh(k,'test2')
-		printh(v,'test2')
+		printh(k,'logs/test2')
+		printh(v,'logs/test2')
 	end
 end
 -->8
@@ -1211,9 +1211,7 @@ function mk_combat_st()
 			local tar_t=a_st.tar_t
 
 			if(act_card==nil)then
-				printh('hi','test')
 				if(a_st.turn=='enemy')then
-					printh('et','test')
 					local e=sel_active_e(a_st.eg)
 					
 					local cs=flr(rnd(#e.hand))+1
@@ -1242,7 +1240,6 @@ function mk_combat_st()
 							most_ef=k
 						end
 					end
-					printh(most_ef,'eft')
 					if(most_ef=='atk')then
 						a_st.tar_t=a_st.pg
 					end
@@ -1305,7 +1302,6 @@ function mk_combat_st()
 				if(timer%2==0)a_st.shake=-a_st.shake
 			end
 			if(timer-self.w_stamp>50)then
-				printh('end time of wait','test')
 				a_st.g_off=0
 				cs.owner.anim:set('idle')
 				if(a_st.turn=='enemy')then
@@ -1347,7 +1343,6 @@ function mk_combat_st()
 		end
 		
 		function sel_active_e(eg)
-			printh('sel_active_e','test')
 			local sel = flr(rnd(#eg.ents))+1
 			local e = eg.ents[sel]
 			if(not e.active) e = sel_active_e(eg)
