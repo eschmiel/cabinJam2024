@@ -194,39 +194,21 @@ function mk_explore_st()
 		self:handle_inputs()
 		room:update()
 		self.p:update(room)
-		self:handle_doors()
+		handle_doors(self)
 	end
 	
 	function st:draw()
-		local room
-		room = self:get_cur_room()
-		room:draw()
+		self:draw_cur_room()
 		self.p:draw(room)
 		if(self.diag)then
 			self.diag:draw()
 		end
-		room = self:get_cur_room()
 	end
-	
-	function st:handle_doors()
+
+	function st:draw_cur_room()
 		local room
-		local p = self.p
-		local ec = p:engage_col()
 		room = self:get_cur_room()
-		for door in all(room.doors)do
-			if(colliding(door.col,ec))then
-				local p_start
-				local tar_ent
-				local cur_r
-				self.cur_r=door.dest.room_id
-				tar_r=self:get_cur_room()
-				tar_ent_id=door.dest.door --target entrance
-				tar_ent=tar_r.doors[tar_ent_id]
-				p_start=tar_ent.get_ent_pos(p)
-				self.p.x=p_start[1]
-				self.p.y=p_start[2]
-			end
-		end
+		room:draw()
 	end
 	
 	function st:handle_inputs()
@@ -303,6 +285,47 @@ function mk_explore_st()
 	st.controller=st:mk_explore_cont()
 
 	return st
+end
+
+
+----- Explore Helpers -----
+
+
+function handle_doors(st)
+	local room
+	local ec = st.p:engage_col()
+	room = st:get_cur_room()
+	for door in all(room.doors)do
+		if(colliding(door.col,ec))then
+			use_room_door(st, door)
+		end
+	end
+end
+
+function use_room_door(st,door)
+	local cur_r -- current room
+	local tar_r --target room
+	local tar_ent_id--target entrance id
+	local tar_ent--target entrance
+	local p_start--player start pos in new rooms
+
+	--set new current room
+	st.cur_r=door.dest.room_id
+	--get new current room	
+	tar_r=st:get_cur_room()
+	
+	--extract target entrance id
+	tar_ent_id=door.dest.door
+	--get target entrance in target room
+	tar_ent=tar_r.doors[tar_ent_id]
+	
+	--get player start position
+	--in new room
+	p_start=tar_ent.get_ent_pos(st.p)
+
+	--set new player start position
+	st.p.x=p_start[1]
+	st.p.y=p_start[2]
 end
 
 function mk_rooms(p)
