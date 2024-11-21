@@ -51,6 +51,13 @@ end
 
 function _draw()
 	cls()
+	pal(5,-15,1)
+	pal(6,1,1)
+	pal(7,-4,1)
+	pal(1,0,1)
+--	pal(4,-12,1)
+--pal(1,0)
+--	█…∧░
 	app_state:draw()
 end
 -->8
@@ -96,7 +103,7 @@ function mk_title_st()
 		end
 	}
 	
-	function	st:update()
+	function st:update()
 		if(btnp(❎))then
 			app_state=mk_active_g_st()
 		end
@@ -115,7 +122,21 @@ end
 function mk_active_g_st()
 	local st = {}
 	st.screen_st=mk_explore_st()
-	st.party={
+	st.party=mk_init_party()
+	
+	function st:update()
+		st.screen_st:update()
+	end
+	
+	function st:draw()
+		st.screen_st:draw()	
+	end
+	
+	return st
+end
+
+function mk_init_party()
+	return {
 		{
 			ch=pork_ch,
 			eqp={
@@ -152,16 +173,6 @@ function mk_active_g_st()
 			}
 		}
 	}
-	
-	function st:update()
-		st.screen_st:update()
-	end
-	
-	function st:draw()
-		st.screen_st:draw()	
-	end
-	
-	return st
 end
 -->8
 --explore state
