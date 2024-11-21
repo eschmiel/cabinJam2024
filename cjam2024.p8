@@ -183,26 +183,14 @@ function mk_explore_st()
 	st.cur_r=1 --current room
 	st.p=mk_player(30,30)
 	
+	function st:start_dia(txt)
+		self.dia=mk_dia(self.p, txt)
+	end
+
+-- manage current room
+
 	function st:get_cur_room()
 		return self.rooms[self.cur_r]
-	end
-	
-	function st:update()
-		local room
-		room = self:get_cur_room()
-
-		self:handle_inputs()
-		room:update()
-		self.p:update(room)
-		handle_doors(self)
-	end
-	
-	function st:draw()
-		self:draw_cur_room()
-		self.p:draw(room)
-		if(self.diag)then
-			self.diag:draw()
-		end
 	end
 
 	function st:draw_cur_room()
@@ -210,86 +198,76 @@ function mk_explore_st()
 		room = self:get_cur_room()
 		room:draw()
 	end
-	
-	function st:handle_inputs()
-		self.controller:update(self)
-	end
 
-	function st.mk_explore_cont()
-		local cont={
-			st='walk',
-			st_conts={}
-		}
-		function cont:set(st)
-			if(self.st!=st)then
-				self.st=st
-			end
-		end
-		
-		function cont:update(a_st)
-			local cont 
-			cont=self.st_conts[self.st]
-			cont(self,a_st)
-		end
-
-		function cont.st_conts:walk(a_st)
-			local p = a_st.p
-			local r=a_st:get_cur_room()
-			local moving = false
-			if(btn(⬆️))then
-				p:move(⬆️)
-				moving=true
-			end
-			if(btn(➡️))then
-				p:move(➡️)
-				moving=true	
-			end
-			if(btn(⬇️))then
-				p:move(⬇️)
-				moving=true
-			end
-			if(btn(⬅️))then
-				p:move(⬅️)
-				moving=true
-			end
-			if(btnp(🅾️))then
-				local ec=p:engage_col()
-				for npc in all(r.npcs) do
-					if(colliding(npc:col(),ec))then
-						self:set("diag")
-						a_st.diag=mk_diag(p,npc.txt)
-					end
-				end
-			end
-			if(btnp(❎))then
-				app_state.screen_st=mk_combat_st()
-			end
-			if(moving)then
-				p.st='walk'
-			else
-				p.st='idle'
-			end
-		end
-		
-		function	cont.st_conts:diag(a_st)
-			local d = a_st.diag
-			if(btnp(🅾️)) d.cur+=1
-			if(d.cur>#d.txt)then
-				cont:set('walk')
-				a_st.diag=nil
-			end
-		end		
-		return cont
+	function st:update_cur_room()
+		local room
+		room = self:get_cur_room()
+		room:update()
 	end
 	
-	st.controller=st:mk_explore_cont()
+-- life cycle functions
+
+	function st:update()
+		self.controller:update()
+		
+		self:update_cur_room()
+		self.p:update()
+
+		handle_wall_cols(self)
+		handle_doors(self)
+	end
+	
+	function st:draw()
+		self:draw_cur_room()
+		self.p:draw()
+		if(self.dia)then
+			self.dia:draw()
+		end
+	end
+
+	st.controller=mk_explore_cont(st)
 
 	return st
 end
 
 
------ Explore Helpers -----
+----- explore helpers -----
 
+
+----- handle environment interactions -----
+
+
+function handle_interact(scr_st)
+	local r = scr_st:get_cur_room()
+	local p = scr_st.p
+	local ec=p:engage_col()
+	for npc in all(r.npcs) do
+		if(colliding(npc:col(),ec))then
+			scr_st.controller:set("dia")
+			scr_st:start_dia(npc.txt)
+		end
+	end
+end
+
+--handle wall collisions 
+function handle_wall_cols(st)
+	local p = st.p
+	local r = st:get_cur_room()
+	for w_col in all (r.walls) do
+		if(colliding(p:u_col(),w_col))
+		then p.y=w_col[4]+1
+		end
+		if(colliding(p:r_col(),w_col))
+		then p.x=w_col[1]-8
+		end
+		if(colliding(p:d_col(),w_col))
+		then p.y=w_col[2]-8
+		end
+		if(colliding(p:l_col(),w_col))
+		then p.x=w_col[3]+1
+		end
+	end
+end
 
 function handle_doors(st)
 	local room
@@ -327,6 +305,10 @@ function use_room_door(st,door)
 	st.p.x=p_start[1]
 	st.p.y=p_start[2]
 end
+
+
+----- rooms -----
+
 
 function mk_rooms(p)
 	local rooms = {}
@@ -474,6 +456,93 @@ function get_map_flags(map_id)
 		end
 	end
 end
+
+
+----- controller -----
+
+
+function mk_explore_cont(scr_st)
+	exam_tbl(scr_st)
+	return {
+		--controller state
+		st='walk',
+
+		--set controller state
+		set=function(self,n_st) 
+			if(self.st!=n_st)then
+				self.st=n_st
+			end
+		end,
+		
+		get_cur_st_cont=function(self)
+			return self.st_conts[self.st]
+		end,
+
+		update=function(self)
+			local cur_c
+			cur_c=self:get_cur_st_cont()
+			cur_c(self,scr_st)
+		end,
+
+		st_conts={
+			walk=run_walk_inputs,
+			dia=run_dia_inputs
+		}
+	}
+end
+
+
+----- walk controls -----
+
+
+function run_walk_inputs(self,scr_st)
+	local p = scr_st.p
+	local r=scr_st:get_cur_room()
+	local moving = false
+	if(btn(⬆️))then
+		p:move(⬆️)
+		moving=true
+	end
+	if(btn(➡️))then
+		p:move(➡️)
+		moving=true	
+	end
+	if(btn(⬇️))then
+		p:move(⬇️)
+		moving=true
+	end
+	if(btn(⬅️))then
+		p:move(⬅️)
+		moving=true
+	end
+	if(btnp(🅾️))then
+		handle_interact(scr_st)
+	end
+	if(btnp(❎))then
+		app_state.screen_st=mk_combat_st()
+	end
+
+	if(moving)then
+		p.st='walk'
+	else
+		p.st='idle'
+	end
+end
+	
+
+----- dialogue controls -----
+
+
+function run_dia_inputs(self, scr_st)
+	local d = scr_st.dia
+	if(btnp(🅾️)) d.cur+=1
+	if(d.cur>#d.txt)then
+		self:set('walk')
+		scr_st.dia=nil
+	end
+end
+
+
 -->8
 --explore entities
 
@@ -598,32 +667,13 @@ function mk_player(x,y)
 	 
 	 return walls
 	end
-
-	function p:handle_col(r)
-	 	
-	 for w_col in all (r.walls) do
-		 if(colliding(self:u_col(),w_col))
-		 then self.y=w_col[4]+1
-		 end
-		 if(colliding(self:r_col(),w_col))
-		 then self.x=w_col[1]-8
-		 end
-		 if(colliding(self:d_col(),w_col))
-		 then self.y=w_col[2]-8
-		 end
-		 if(colliding(self:l_col(),w_col))
-		 then self.x=w_col[3]+1
-		 end
-	 end
-	end
 	
-	function p:update(room)
-		self:handle_col(room)
+	function p:update()
 		p.anim:set(p.st)
 		p.anim:update()
 	end
 	
-	function p:draw(room)
+	function p:draw()
 --		for r in all(room.walls) do
 --			rect(r[1],r[2],r[3],r[4],7)
 --		end
@@ -947,7 +997,7 @@ end
 
 ----- text box -----
 
-function mk_diag(p,txt)
+function mk_dia(p,txt)
 	local h = 36
 	local bot = p.y<64
 	local y = 2
@@ -957,12 +1007,12 @@ function mk_diag(p,txt)
 		ey=122
 	end
 	
-	local diag={
+	local dia={
 		txt=txt,
 		cur=1
 	}
 	
-	function diag:draw()
+	function dia:draw()
 		local marg=6
 		rectfill(8,y,120,ey,0)
 		rect(8,y,120,ey,7)
@@ -973,7 +1023,7 @@ function mk_diag(p,txt)
 		end
 	end
 	
-	return diag
+	return dia
 end
 
 function draw_stats(ent)
@@ -1427,12 +1477,12 @@ function mk_combat_st()
 --			end
 --		end
 		
-		function	cont.st_conts:diag(a_st)
---			local d = a_st.diag
+		function	cont.st_conts:dia(a_st)
+--			local d = a_st.dia
 --			if(btnp(🅾️)) d.cur+=1
 --			if(d.cur>#d.txt)then
 --				cont:set('walk')
---				a_st.diag=nil
+--				a_st.dia=nil
 --			end
 		end		
 		return cont
