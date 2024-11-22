@@ -515,36 +515,7 @@ function mk_player(x,y)
 		y=y,
 		right=false,
 		anim=mk_animator({
-			anim_tbl={
-				idle={
-					{
-						spr=4,
-						time=10
-					},
-					{
-					 spr=7,
-					 time=15
-					}
-				},
-				walk={
-					{
-						spr=4,
-						time=5
-					},
-					{
-					 spr=5,
-					 time=2,
-					},
-					{
-					 spr=4,
-					 time=5
-					},
-					{
-					 spr=6,
-					 time=2
-					}
-				}
-			}
+			anim_tbl=anim_tbls.ex_player
 		})
 	}
 	
@@ -676,7 +647,7 @@ function mk_npc(opt)
 	}
 
 	local ani_opt={
-		anim_tbl=npc_anim_tbls[opt.type],
+		anim_tbl=anim_tbls[opt.type],
 		state='idle'
 	}
 	
@@ -685,9 +656,9 @@ function mk_npc(opt)
 	return npc
 end
 
-npc_anim_tbls={}
+anim_tbls={}
 
-npc_anim_tbls.cloak={
+anim_tbls.cloak={
 	idle={
 		{
 			spr=2,
@@ -697,6 +668,37 @@ npc_anim_tbls.cloak={
 		 spr=3,
 		 time=10
 	 	}
+	}
+}
+
+anim_tbls.ex_player={
+	idle={
+		{
+			spr=4,
+			time=10
+		},
+		{
+		 spr=7,
+		 time=15
+		}
+	},
+	walk={
+		{
+			spr=4,
+			time=5
+		},
+		{
+		 spr=5,
+		 time=2,
+		},
+		{
+		 spr=4,
+		 time=5
+		},
+		{
+		 spr=6,
+		 time=2
+		}
 	}
 }
 -->8
