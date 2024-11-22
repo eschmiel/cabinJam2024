@@ -14,23 +14,6 @@ __lua__
 
 -- to do
 
---explore state
----[x]map
----[x]walls
----[x]dialogue
----[x]npcs
----[x]transitions
---combat state
----[x]player grid, enemy grid
----[x]turns
----[x]select card
----[x]select target
----[x]cards, random draw
----[x]card effects, dmg, heal
-
-
------next-----
---card effects
 
 --design cards
 --equipment
@@ -179,7 +162,7 @@ end
 
 function mk_explore_st()
 	local st={}
-	st.rooms=mk_rooms()
+	st.rooms=map_seq(room_defs,mk_room)
 	st.cur_r=1 --current room
 	st.p=mk_player(30,30)
 	
@@ -310,86 +293,6 @@ end
 ----- rooms -----
 
 
-function mk_rooms(p)
-	local rooms = {}
-	rooms[1]=mk_room({
-		map_id=0,
-		doors={
-		 {
-			col={
-				134,
-				48,
-				136,
-				64
-			},
-			dest={
-				room_id=2,
-				door=1
-			},
-			get_ent_pos=function(p)--entrance position
-				return{126, p.y}
-			end
-		}
-		},
-		npcs={
-			mk_cloak_npc({
-				x=8,
-				y=16,
-				txt={
-					{
-						'i never tell the truth'
-					}
-				}
-			}),
-			mk_cloak_npc({
-				x=8,
-				y=76,
-				txt={
-					{
-						'i always tell lies'
-					}
-				}
-			})
-		}
-	})
-	
-	rooms[2]=mk_room({
-		map_id=1,
-		doors={
-			{
-				col={
-					-6,
-					48,
-					-8,
-					64
-				},
-				dest={
-					room_id=1,
-					door=1
-				},
-				get_ent_pos=function(p)--entrance position
-					return {-4, p.y}
-				end
-			}
-		},
-		npcs={
-			mk_cloak_npc({
-			 x=80,
-			 y=24,
-			 txt={
-			 	{
-			 		"can you feel the rot",
-			 		"in your eyes?"
-			 	}
-			 },
-			 left=true
-			})
-		}
-	})
-		
-	return rooms
-end
-
 function map_walls(map_id)
 	local walls={}
 	local off = map_id*16
@@ -408,21 +311,42 @@ function map_walls(map_id)
 	return walls
 end
 
+function get_walls(room)
+	local walls={}
+	
+	function add_if_wall(x,y)
+		local off = room.map_id*16
+		local mt=mget(x+off,y)
+		if(fget(mt,0))then
+			sx=x*8
+			sy=y*8
+			local wall={sx,sy,sx+7,sy+7}
+			add(walls,wall)
+		end
+	end
+
+	walk_map(16,16,add_if_wall)
+
+	return walls
+end
+
 function mk_room(opt)
 	local r = {}
 	local map_id=opt.map_id
-	local npcs=opt.npcs or {}
+	local npc_defs=opt.npcs or {}
+	
+	r.npcs=map_seq(npc_defs,mk_npc) 
 	r.map_id=map_id
-	r.npcs=npcs
+
 	r.walls={}
 	r.npc_cols={}
 	r.doors=opt.doors or {}
 	
-	local m_walls=map_walls(map_id)
+	local m_walls=get_walls(r)
 	copy_tbl_into(m_walls,r.walls)
 	
 	local npc_cols={}
-	for npc in all(npcs) do
+	for npc in all(r.npcs) do
 		add(npc_cols,npc:col())
 	end
 	
@@ -457,6 +381,85 @@ function get_map_flags(map_id)
 	end
 end
 
+room_defs={}
+
+room_defs[1]={
+	map_id=0,
+	doors={
+		{
+		col={
+			134,
+			48,
+			136,
+			64
+		},
+		dest={
+			room_id=2,
+			door=1
+		},
+		get_ent_pos=function(p)--entrance position
+			return{126, p.y}
+		end
+	}
+	},
+	npcs={
+		{
+			type="cloak",
+			x=8,
+			y=16,
+			txt={
+				{
+					'i never tell the truth'
+				}
+			}
+		},
+		{
+			type="cloak",
+			x=8,
+			y=76,
+			txt={
+				{
+					'i always tell lies'
+				}
+			}
+		}
+	}
+}
+
+room_defs[2]={
+	map_id=1,
+	doors={
+		{
+			col={
+				-6,
+				48,
+				-8,
+				64
+			},
+			dest={
+				room_id=1,
+				door=1
+			},
+			get_ent_pos=function(p)--entrance position
+				return {-4, p.y}
+			end
+		}
+	},
+	npcs={
+		{
+			type='cloak',
+			x=80,
+			y=24,
+			txt={
+				{
+					"can you feel the rot",
+					"in your eyes?"
+				}
+			},
+			left=true
+		}
+	}
+}
 
 ----- controller -----
 
@@ -692,52 +695,52 @@ function mk_player(x,y)
 end
 
 
-function mk_cloak_npc(opt)
+function mk_npc(opt)
 	local npc={
 		x=opt.x,
 		y=opt.y,
 		txt=opt.txt or {},
-		left=opt.left
+		left=opt.left,
+		update=function(self)
+			self.anim:update()
+		end,
+		draw=function(self)
+			self.anim:draw(self.x,self.y,self.left)
+		end,
+		col=function(self)
+			return {
+				self.x,
+				self.y,
+				self.x+7,
+				self.y+7
+			}
+		end
 	}
 
-	function npc:col()
-		return {
-			npc.x,
-			npc.y,
-			npc.x+7,
-			npc.y+7
-		}
-	end
-	
 	local ani_opt={
-		anim_tbl={
-			idle={
-				{
-					spr=2,
-					time=15
-				},
-				{
-				 spr=3,
-				 time=10
-			 }
-			}
-		},
+		anim_tbl=npc_anim_tbls[opt.type],
 		state='idle'
 	}
 	
 	npc.anim=mk_animator(ani_opt)
 	
-	function npc:update()
-		self.anim:update()
-			
-	end
-	
-	function npc:draw()
-		self.anim:draw(self.x,self.y,self.left)
-	end
-	
 	return npc
 end
+
+npc_anim_tbls={}
+
+npc_anim_tbls.cloak={
+	idle={
+		{
+			spr=2,
+			time=15
+		},
+		{
+		 spr=3,
+		 time=10
+	 	}
+	}
+}
 -->8
 --utilities
 
@@ -994,6 +997,27 @@ function copy_tbl_into(src,tar)
 	end
 end
 
+function map_seq(tbl,func)
+	local copy_tbl={}
+	for item in all(tbl) do
+		add(copy_tbl,func(item))
+	end
+	return copy_tbl
+end
+
+
+----- map -----
+
+function walk_map(w,h,func,params)
+	local results
+	for y=0,16 do
+		for x=0,16 do
+			add(results,func(x,y,params))
+		end
+	end
+	return results
+end
+
 
 ----- text box -----
 
@@ -1033,7 +1057,6 @@ function draw_stats(ent)
 	local marg=6
 	local lh=const.letter_width
 	local lih=const.line_height
---	exam_tbl(ent)
 	
 	rectfill(x,y,120,h,0)
 	rect(x,y,120,h,7)
