@@ -293,24 +293,6 @@ end
 ----- rooms -----
 
 
-function map_walls(map_id)
-	local walls={}
-	local off = map_id*16
-	for y=0,16 do
-		for x=0,16 do
-			local mt=mget(x+off,y)
-			if(fget(mt,0))then
-				sx=x*8
-				sy=y*8
-				local wall={sx,sy,sx+7,sy+7}
-				add(walls,wall)
-			end
-		end
-	end
-	
-	return walls
-end
-
 function get_walls(room)
 	local walls={}
 	
@@ -331,54 +313,30 @@ function get_walls(room)
 end
 
 function mk_room(opt)
-	local r = {}
-	local map_id=opt.map_id
-	local npc_defs=opt.npcs or {}
-	
-	r.npcs=map_seq(npc_defs,mk_npc) 
-	r.map_id=map_id
-
-	r.walls={}
-	r.npc_cols={}
-	r.doors=opt.doors or {}
-	
-	local m_walls=get_walls(r)
-	copy_tbl_into(m_walls,r.walls)
-	
-	local npc_cols={}
-	for npc in all(r.npcs) do
-		add(npc_cols,npc:col())
-	end
-	
-	r.npc_cols=npc_cols
-	copy_tbl_into(npc_cols,r.walls)
-
-	function r:update()
-		for npc in all(r.npcs) do
-			npc:update()
+	local r = {
+		map_id=opt.map_id,
+		npcs=map_seq(opt.npcs or {},mk_npc),
+		doors=opt.doors or {},
+		update=function(self)
+			call_seq(self.npcs,'update')
+		end,
+		draw=function(self)
+			local x = self.map_id*16
+			map(x,0)
+			call_seq(self.npcs,'draw')
 		end
-	end
-	
-	function r:draw()
-		local x = self.map_id*16
-		map(x,0)
-		for npc in all(r.npcs) do
-			npc:draw()
-		end
-	end
+	}
+
+	set_room_walls(r)
 	
 	return r
 end
 
-function get_map_flags(map_id)
-	local offset=map_id*16
-	for y=0,16 do
-		for x=0,16 do
-		 local m_tile
-		 m_tile=mget(x+offset,y+offset)
-			
-		end
-	end
+function set_room_walls(r)
+	r.walls=get_walls(r)
+	map_seq(r.npcs,function(npc)
+		add(r.walls,npc:col())
+	end)
 end
 
 room_defs={}
@@ -470,6 +428,11 @@ function mk_explore_cont(scr_st)
 		--controller state
 		st='walk',
 
+		st_conts={
+			walk=run_walk_inputs,
+			dia=run_dia_inputs
+		},
+		
 		--set controller state
 		set=function(self,n_st) 
 			if(self.st!=n_st)then
@@ -485,12 +448,7 @@ function mk_explore_cont(scr_st)
 			local cur_c
 			cur_c=self:get_cur_st_cont()
 			cur_c(self,scr_st)
-		end,
-
-		st_conts={
-			walk=run_walk_inputs,
-			dia=run_dia_inputs
-		}
+		end
 	}
 end
 
@@ -1005,8 +963,15 @@ function map_seq(tbl,func)
 	return copy_tbl
 end
 
+function call_seq(seq,func_n)
+	for item in all(seq) do
+		item[func_n](item)
+	end
+end
+
 
 ----- map -----
+
 
 function walk_map(w,h,func,params)
 	local results
@@ -1016,6 +981,16 @@ function walk_map(w,h,func,params)
 		end
 	end
 	return results
+end
+
+function get_map_flags(map_id)
+	local offset=map_id*16
+	for y=0,16 do
+		for x=0,16 do
+		 local m_tile
+		 m_tile=mget(x+offset,y+offset)
+		end
+	end
 end
 
 
