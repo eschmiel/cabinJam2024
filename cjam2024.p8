@@ -1141,6 +1141,7 @@ function mk_combat_st()
 		ents=st.e_party
 	})
 	st.hand=mk_hand(st.party)
+	st.show_act=false
 	
 	function st:update()
 		st.cont:update(self)
@@ -1174,85 +1175,110 @@ end
 
 function run_sel_card_inputs(self,scr_st)
 	local hand=scr_st.hand
-	local selected_c=hand.cards[hand.sel]
-	if(btnp(⬆️) or btnp(➡️))then
-		hand.sel+=1
-		if(hand.sel>#hand.cards)then
-		hand.sel=1
-		end
-	end
-	if(btnp(⬅️) or btnp(⬇️))then
-		hand.sel-=1
-		if(hand.sel<1)then
-		hand.sel=#hand.cards
-		end
-	end
+	local selected_c=hand:sel_c()
+
+	if(btnp(⬆️) or btnp(➡️)) hand.sel+=1
+	if(btnp(⬅️) or btnp(⬇️)) hand.sel-=1
+
+	handle_hand_sel_bounds(hand)
 	
 	if(btnp(🅾️)and selected_c.owner.active)then
-		scr_st.cont:set('sel_t')
-		scr_st.tar_t=scr_st.eg
+		sel_c_to_sel_t(scr_st)
 	end
 	
-	if(btnp(❎))then
-		scr_st.cont:set('sel_g')
-		scr_st.hand.sel=nil
-		scr_st.pg.sel={2,2}
-		scr_st.tar_t=scr_st.pg
-	end
+	if(btnp(❎)) sel_c_to_sel_g(scr_st)
 end
 
+function handle_hand_sel_bounds(hand)
+	if(hand.sel<1) hand.sel=#hand.cards
+	if(hand.sel>#hand.cards) hand.sel=1
+end
+
+-- helpers
+
+function sel_c_to_sel_g(scr_st)
+	scr_st.cont:set('sel_g')
+	scr_st.hand.sel=nil
+	scr_st.pg.sel={2,2}
+	scr_st.tar_t=scr_st.pg
+end
+
+function sel_c_to_sel_t(scr_st)
+	scr_st.cont:set('sel_t')
+	scr_st.tar_t=scr_st.eg
+end
+
+------
+
 function run_sel_grid_inputs(self,scr_st)
-	local t=scr_st.tar_t
-	local eg=scr_st.eg
-	local pg=scr_st.pg
-	local sel=t.sel
+	local sel=scr_st.tar_t.sel
 	
 	if(btnp(⬆️))then
-		t.sel[2]-=1
+		sel[2]-=1
 	end
 	if(btnp(➡️))then
-		t.sel[1]+=1
-		if(t==pg and t.sel[1]>3)then
-			local cs=sel
-			t.sel=nil
-			scr_st.tar_t=eg
-			t=eg
-			t.sel=cs
-			t.sel[1]=1
-		end
+		sel[1]+=1
 	end
 	if(btnp(⬇️))then
-		t.sel[2]+=1
+		sel[2]+=1
 	end
 	if(btnp(⬅️))then
 		sel[1]-=1
-		if(t==eg and t.sel[1]<1)then
-			local cs=sel
-			t.sel=nil
-			scr_st.tar_t=pg
-			t=pg
-			t.sel=cs
+	end
+
+	handle_sel_g_bounds(scr_st)
+
+	if(btnp(❎)) sel_g_to_sel_c(scr_st)
+end
+
+--helpers
+
+function handle_sel_g_bounds(scr_st)
+	local eg=scr_st.eg
+	local pg=scr_st.pg
+	local t=scr_st.tar_t
+
+	if(t.sel[1]<1)then
+		if(t==eg) then
+			t.sel[1]=3
+			move_sel_to_grid(scr_st,pg)
+		else
+			t.sel[1]=1
+		end
+	elseif(t.sel[1]>3) then 
+		if(t==pg) then
+			t.sel[1]=1
+			move_sel_to_grid(scr_st,eg)
+		else
 			t.sel[1]=3
 		end
 	end
 
-	if(t.sel[1]<1)t.sel[1]=1
-	if(t.sel[1]>3)t.sel[1]=3
-	if(t.sel[2]<1)t.sel[2]=1
-	if(t.sel[2]>3)t.sel[2]=3
-
-	if(btnp(❎))then
-		scr_st.hand.sel=1
-		scr_st.tar_t.sel=nil
-		scr_st.cont.st='sel_c'
-		scr_st.tar_t=nil
-	end
+	grid_pos_min_max(scr_st.tar_t.sel,2)
 end
+
+function  move_sel_to_grid(scr_st,grid)
+	local tar_t = scr_st.tar_t	
+	local cs=copy_tbl(tar_t.sel)
+	tar_t.sel=nil
+	scr_st.tar_t=grid	
+	grid.sel=cs
+end
+
+function sel_g_to_sel_c(scr_st)
+	scr_st.hand.sel=1
+	scr_st.cont.st='sel_c'
+	scr_st.tar_t.sel=nil
+	scr_st.tar_t=nil
+end
+
+-----
 
 function run_sel_tar_inputs(self,scr_st)
 	local t=scr_st.tar_t
 	local pg=scr_st.pg
 	local eg=scr_st.eg
+
 	if(btnp(➡️) and t==pg)then
 		scr_st.tar_t=eg
 	end
@@ -1260,17 +1286,17 @@ function run_sel_tar_inputs(self,scr_st)
 		scr_st.tar_t=pg
 	end
 	if(btnp(🅾️))then
---				scr_st.tar_t=nil
 		scr_st.cont.st='wait'
 		sfx(1,1)
 		self.w_stamp=timer
---				scr_st.hand.sel=nil
 	end
 	if(btnp(❎))then
 		scr_st.tar_t=nil
 		scr_st.cont.st='sel_c'
 	end
 end
+
+-----
 
 function run_wait_inputs(self,scr_st)
 	local act_card=scr_st.act_card
@@ -1545,23 +1571,6 @@ function draw_sel(x,y,sel)
 	
 end
 
---grid position to screen coordinates
-function g_pos_to_scr(x,y,pos)
---start of grid screen coordinates
---start at 0 but positions start
---at 1
-
---grid  square width
-	local g_sq_w=16
---grid square height
-	local g_sq_h=18
-	
-	return {
-		x + (pos[1]-1) * g_sq_w,
-		y + (pos[2]-1) * g_sq_h,
-	}
-end
-
 function draw_card(x,y,c)
 	local c_color = 4
 	if(not c.owner.active) c_color=13
@@ -1643,6 +1652,10 @@ function mk_hand(p)
 		end
 	end
 
+	function hand:sel_c()
+		return self.cards[self.sel]
+	end
+
 	function hand:draw()
 		local ch=const.card_height
 		local cw=const.card_width
@@ -1676,49 +1689,6 @@ function offset_by_pos(x,y,w,h,pos)
 		x + (pos[1]-1) * w,
 		y + (pos[2]-1) * h,
 	}
-end
-
-function sum_pos_to_scr(x,y,pos)
-	local coord_x
-	local coord_y
-	if(pos==1) then
-		coord_x=x
-		coord_y=y
-	end
-	if(pos==2) then
-		coord_x=x+6
-		coord_y=y
-	end
-	if(pos==3) then
-		coord_x=x+12
-		coord_y=y
-	end
-	if(pos==4) then
-		coord_x=x
-		coord_y=y+6
-	end
-	if(pos==5) then
-		coord_x=x+6
-		coord_y=y+6
-	end
-	if(pos==6) then
-		coord_x=x+12
-		coord_y=y+6
-	end
-	if(pos==7) then
-		coord_x=x
-		coord_y=y+12
-	end
-	if(pos==8) then
-		coord_x=x+6
-		coord_y=y+12
-	end
-	if(pos==9) then
-		coord_x=x+12
-		coord_y=y+12
-	end
-	
-	return {coord_x,coord_y}
 end
 
 --we're really building the party
