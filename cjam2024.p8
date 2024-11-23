@@ -923,10 +923,10 @@ end
 
 
 function colliding(box1,box2)
- return  box1[1] <= box2[3] and
-   					 box1[2] <= box2[4] and
-   					 box1[3] >= box2[1] and
-   					 box1[4] >= box2[2]
+ return box1[1] <= box2[3] and
+		box1[2] <= box2[4] and
+		box1[3] >= box2[1] and
+		box1[4] >= box2[2]
 end
 
 
@@ -940,15 +940,15 @@ function copy_tbl_into(src,tar)
 end
 
 function copy_tbl(src)
-	local copy_tbl={}
-	for item in all(tbl) do
+	local result={}
+	for item in all(src) do
 		local copy_item=item
 			if(type(item) =='table')then
 				copy_item=copy_tbl(item)
 			end
-		add(copy_tbl,item)
+		add(result,copy_item)
 	end
-	return copy_tbl
+	return result
 end
 
 function map_seq(tbl,func)
@@ -965,14 +965,20 @@ function call_seq(seq,func_n)
 	end
 end
 
+function find(tbl,func)
+	for k,v in ipairs(tbl)do
+		if(func(v)) return{k=k,v=v}
+	end
+end
+
 
 ----- map -----
 
 
 function walk_map(w,h,func,params)
 	local results
-	for y=0,16 do
-		for x=0,16 do
+	for y=0,h-1 do
+		for x=0,w-1 do
 			add(results,func(x,y,params))
 		end
 	end
@@ -987,6 +993,17 @@ function get_map_flags(map_id)
 		 m_tile=mget(x+offset,y+offset)
 		end
 	end
+end
+
+
+----- positions -----
+
+
+function same_pos(pos1,pos2)
+	return (
+		pos1[1]==pos2[1]
+		and pos1[2]==pos2[2]
+	)
 end
 
 
@@ -1179,7 +1196,7 @@ function run_sel_card_inputs(self,scr_st)
 	if(btnp(❎))then
 		scr_st.cont:set('sel_g')
 		scr_st.hand.sel=nil
-		scr_st.pg.sel=5
+		scr_st.pg.sel={2,2}
 		scr_st.tar_t=scr_st.pg
 	end
 end
@@ -1189,41 +1206,41 @@ function run_sel_grid_inputs(self,scr_st)
 	local eg=scr_st.eg
 	local pg=scr_st.pg
 	local sel=t.sel
-	if(btnp(⬆️)and sel>3)then
-		t.sel-=3
+	
+	if(btnp(⬆️))then
+		t.sel[2]-=1
 	end
 	if(btnp(➡️))then
-		if(sel%3==0)then
-			if(t==pg)then
-				local cs=sel
-				t.sel=nil
-				scr_st.tar_t=eg
-				t=eg
-				t.sel=cs-2
-			end
-		else
-			t.sel+=1
+		t.sel[1]+=1
+		if(t==pg and t.sel[1]>3)then
+			local cs=sel
+			t.sel=nil
+			scr_st.tar_t=eg
+			t=eg
+			t.sel=cs
+			t.sel[1]=1
 		end
 	end
-	if(btnp(⬇️)and sel<7)then
-		t.sel+=3
+	if(btnp(⬇️))then
+		t.sel[2]+=1
 	end
 	if(btnp(⬅️))then
-		if(sel==1
-			or sel==4
-			or sel==7
-		)then
-			if(t==eg)then
-				local cs=sel
-				t.sel=nil
-				scr_st.tar_t=pg
-				t=pg
-				t.sel=cs+2
-			end
-		else
-			t.sel-=1
+		sel[1]-=1
+		if(t==eg and t.sel[1]<1)then
+			local cs=sel
+			t.sel=nil
+			scr_st.tar_t=pg
+			t=pg
+			t.sel=cs
+			t.sel[1]=3
 		end
 	end
+
+	if(t.sel[1]<1)t.sel[1]=1
+	if(t.sel[1]>3)t.sel[1]=3
+	if(t.sel[2]<1)t.sel[2]=1
+	if(t.sel[2]>3)t.sel[2]=3
+
 	if(btnp(❎))then
 		scr_st.hand.sel=1
 		scr_st.tar_t.sel=nil
@@ -1322,7 +1339,7 @@ function run_wait_inputs(self,scr_st)
 		local tar_e={}
 		for e in all(scr_st.tar_t.ents) do
 			for p in all(tar_p) do
-				if (e.pos==p.pos)then
+				if (same_pos(e.pos,p.pos))then
 					if(p.ef=='atk')then
 						e.hp-=cs.owner.attr.atk
 					end
@@ -1429,6 +1446,7 @@ function mk_grid(opt)
 		local dir
 		local cards
 		local sel_c
+		
 		cards=a_st.hand.cards
 		sel_c=a_st.hand.sel
 		local act_card = a_st.act_card
@@ -1444,7 +1462,7 @@ function mk_grid(opt)
 		if(is_tar and c)then
 			for t in all(c.card.tar) do
 				local s
-				local coord = g_pos_coord(x,y,t.pos)
+				local coord = offset_by_pos(x,y,16,18,t.pos)
 				if(t.ef=="atk")s=72
 				if(t.ef=="heal")s=74
 				if(t.ef=="move")then 
@@ -1469,7 +1487,7 @@ function mk_grid(opt)
 		
 		for ent in all(self.ents) do
 			draw_ent(x,y,ent)
-			if(ent.pos==sel)then
+			if(sel and ent.pos[1]==sel[1] and ent.pos[2]==sel[2])then
 				draw_stats(ent)
 			end
 		end
@@ -1481,7 +1499,7 @@ end
 
 function draw_ent(x,y,ent)
 	local coord
-	coord=g_pos_coord(x,y,ent.pos)
+	coord=offset_by_pos(x,y,16,18,ent.pos)
 	
 	ent:draw(coord[1],coord[2])
 end
@@ -1518,7 +1536,7 @@ function draw_sel(x,y,sel)
 	local coord
 	local sx
 	local sy
-	coord = g_pos_coord(x,y,sel)
+	coord = offset_by_pos(x,y,16,18,sel)
 	sx=coord[1]
 	sy=coord[2]
 	
@@ -1527,47 +1545,21 @@ function draw_sel(x,y,sel)
 	
 end
 
-function g_pos_coord(x,y,pos)
-	local coord_x
-	local coord_y
-	if(pos==1) then
-		coord_x=x
-		coord_y=y
-	end
-	if(pos==2) then
-		coord_x=x+16
-		coord_y=y
-	end
-	if(pos==3) then
-		coord_x=x+32
-		coord_y=y
-	end
-	if(pos==4) then
-		coord_x=x
-		coord_y=y+18
-	end
-	if(pos==5) then
-		coord_x=x+16
-		coord_y=y+18
-	end
-	if(pos==6) then
-		coord_x=x+32
-		coord_y=y+18
-	end
-	if(pos==7) then
-		coord_x=x
-		coord_y=y+36
-	end
-	if(pos==8) then
-		coord_x=x+16
-		coord_y=y+36
-	end
-	if(pos==9) then
-		coord_x=x+32
-		coord_y=y+36
-	end
+--grid position to screen coordinates
+function g_pos_to_scr(x,y,pos)
+--start of grid screen coordinates
+--start at 0 but positions start
+--at 1
+
+--grid  square width
+	local g_sq_w=16
+--grid square height
+	local g_sq_h=18
 	
-	return {coord_x,coord_y}
+	return {
+		x + (pos[1]-1) * g_sq_w,
+		y + (pos[2]-1) * g_sq_h,
+	}
 end
 
 function draw_card(x,y,c)
@@ -1581,11 +1573,20 @@ function draw_card(x,y,c)
 	cx=cent_txt_x(c.card.title,x,cw)
 	print(c.card.title,cx,y+4,9)
 	
-	for pos=1,9 do
+	walk_map(3,3,function(sum_x,sum_y)
+		local pos={
+			sum_x+1,
+			sum_y+1
+		}
 		local coord
-		coord=sum_pos_coord(x+8,y+19,pos)
+		coord=offset_by_pos(x+8,y+19,6,6,pos)
 		rect(coord[1],coord[2],coord[1]+6,coord[2]+6,5)
-	end
+	end)
+	-- for pos=1,9 do
+	-- 	local coord
+	-- 	coord=offset_by_pos(x+8,y+19,6,6,pos)
+	-- 	rect(coord[1],coord[2],coord[1]+6,coord[2]+6,5)
+	-- end
 	
 	local tar = c.card.tar
 	for t in all(tar) do
@@ -1595,7 +1596,7 @@ function draw_card(x,y,c)
 		if(t.ef=='heal')c=11
 		
 		if(t.ef=='move')c=14
-		coord=sum_pos_coord(x+8,y+19,t.pos)
+		coord=offset_by_pos(x+8,y+19,6,6,t.pos)
 		rectfill(coord[1],coord[2],coord[1]+6,coord[2]+6,c)
 		rect(coord[1],coord[2],coord[1]+6,coord[2]+6,5)
 		if(t.ef=='move')then
@@ -1666,7 +1667,18 @@ function mk_hand(p)
 	return hand
 end
 
-function sum_pos_coord(x,y,pos)
+--grid position to screen coordinates
+function offset_by_pos(x,y,w,h,pos)
+	--screen coordinates start at 0
+	--but positions start at 1
+
+	return {
+		x + (pos[1]-1) * w,
+		y + (pos[2]-1) * h,
+	}
+end
+
+function sum_pos_to_scr(x,y,pos)
 	local coord_x
 	local coord_y
 	if(pos==1) then
@@ -1802,13 +1814,20 @@ function mk_c_party()
 end
 
 function fill_pos(pos_tbl)
-	local pos=flr(rnd(9))+1
-	if(pos_tbl[pos])then
-		return fill_pos(pos_tbl)
-	else 
-		pos_tbl[pos]=true
-		return pos
+	local x=flr(rnd(3))+1
+	local y=flr(rnd(3))+1
+	function isPos(pos)
+		return (
+			pos[1]==x 
+			and pos[2]==y
+		)
 	end
+	if(find(pos_tbl,isPos))then
+		return fill_pos(pos_tbl)
+	end
+
+	add(pos_tbl,{x,y})
+	return {x,y}
 end
 
 function pull_card(c_tbl,deck_s)
@@ -1835,31 +1854,28 @@ end
 ---select target
 
 function nav_grid(dir,tar)
- local end_p
- if(dir==⬆️ and tar>3)then
-	 end_p=tar-3
+ 	local end_p=copy_tbl(tar)
+	if(dir==⬆️)then
+		end_p[2]-=1
 	end
 	if(dir==➡️)then
-		if(tar%3==0)then
-		else
-			end_p=tar+1
-		end
+		end_p[1]+=1
 	end
-	if(dir==⬇️ and tar<7)then
-		end_p=tar+3
+	if(dir==⬇️)then
+		end_p[2]+=1
 	end
-	if(dir==⬅️ and not(
-			tar==1
-			or tar==4
-			or tar==7
-		)
-	)then
-			end_p=tar-1
+	if(dir==⬅️)then
+		end_p[1]-=1
 	end
+	grid_pos_min_max(end_p,1)
+	grid_pos_min_max(end_p,2)
 	return end_p
 end
 
-
+function grid_pos_min_max(pos, i)
+	if(pos[i]<1)pos[i]=1
+	if(pos[i]>3)pos[i]=3
+end
 -->8
 --combat entities
 
@@ -1988,93 +2004,93 @@ end
 raze_c={
 	title="RAZE",
 	tar={
-		{pos=2,ef="atk"},
-		{pos=5,ef="atk"},
-		{pos=8,ef="atk"}
+		{pos={2,1},ef="atk"},
+		{pos={2,2},ef="atk"},
+		{pos={2,3},ef="atk"}
 	}
 }
 
 punish_c={
 	title="PUNISH",
 	tar={
-		{pos=2,ef="atk"},
-		{pos=4,ef="atk"},
-		{pos=5,ef="atk"},
-		{pos=6,ef="atk"},
-		{pos=8,ef="atk"}
+		{pos={2,1},ef="atk"},
+		{pos={1,2},ef="atk"},
+		{pos={2,2},ef="atk"},
+		{pos={2,3},ef="atk"},
+		{pos={3,2},ef="atk"}
 	}
 }
 
 beg_c={
 	title="BEG",
 	tar={
-		{pos=1,ef="heal"},
-		{pos=3,ef="heal"},
-		{pos=7,ef="heal"},
-		{pos=9,ef="heal"},
+		{pos={1,1},ef="heal"},
+		{pos={1,3},ef="heal"},
+		{pos={3,1},ef="heal"},
+		{pos={3,3},ef="heal"},
 	}
 }
 
 crook_c={
 	title="CROOK",
 	tar={
-		{pos=5,ef="move",dir=➡️},
+		{pos={2,2},ef="move",dir=➡️},
 	}
 }
 
 scatter_c={
 	title="SCATTER",
 	tar={
-		{pos=2,ef="move",dir=⬅️},
-		{pos=5,ef="move",dir=➡️},
-		{pos=8,ef="move",dir=⬅️},
+		{pos={2,1},ef="move",dir=⬅️},
+		{pos={2,2},ef="move",dir=➡️},
+		{pos={2,3},ef="move",dir=⬅️},
 	}
 }
 
 armag_c={
 	title="ENDTIMES",
 	tar={
-		{pos=1,ef='atk'},
-		{pos=2,ef='atk'},
-		{pos=3,ef='atk'},
-		{pos=4,ef='atk'},
-		{pos=5,ef='atk'},
-		{pos=6,ef='atk'},
-		{pos=7,ef='atk'},
-		{pos=8,ef='atk'},
-		{pos=9,ef='atk'},
+		{pos={1,1},ef='atk'},
+		{pos={2,1},ef='atk'},
+		{pos={3,1},ef='atk'},
+		{pos={1,2},ef='atk'},
+		{pos={2,2},ef='atk'},
+		{pos={3,2},ef='atk'},
+		{pos={1,3},ef='atk'},
+		{pos={2,3},ef='atk'},
+		{pos={3,3},ef='atk'},
 	}	
 }
 
 pat_c={
 	title='PATRICIDE',
 	tar={
-		{pos=5,ef='atk'}
+		{pos={2,2},ef='atk'}
 	}
 }
 
 wheel_c={
 	title="WHEEL",
 	tar={
-		{pos=1,ef="atk"},
-		{pos=2,ef="heal"},
-		{pos=3,ef="move",dir=⬇️},
-		{pos=4,ef="move",dir=⬆️},
-		{pos=6,ef="move",dir=⬇️},
-		{pos=7,ef="move",dir=⬆️},
-		{pos=8,ef="move",dir=⬅️},
-		{pos=9,ef="move",dir=⬅️},
+		{pos={1,1},ef="atk"},
+		{pos={2,1},ef="heal"},
+		{pos={3,1},ef="move",dir=⬇️},
+		{pos={1,2},ef="move",dir=⬆️},
+		{pos={3,2},ef="move",dir=⬇️},
+		{pos={1,3},ef="move",dir=⬆️},
+		{pos={2,3},ef="move",dir=⬅️},
+		{pos={3,3},ef="move",dir=⬅️},
 	}
 }
 
 marked_c={
 	title="MARKED",
 	tar={
-		{pos=1,ef="atk"},
-		{pos=3,ef="atk"},
-		{pos=5,ef="atk"},
-		{pos=7,ef="atk"},
-		{pos=9,ef="atk"},
+		{pos={1,1},ef="atk"},
+		{pos={1,3},ef="atk"},
+		{pos={2,2},ef="atk"},
+		{pos={3,1},ef="atk"},
+		{pos={3,3},ef="atk"},
 	}
 }
 	
