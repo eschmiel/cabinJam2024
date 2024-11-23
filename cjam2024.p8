@@ -157,6 +157,32 @@ function mk_init_party()
 		}
 	}
 end
+
+function mk_controller(scr_st,st_conts,init_st)
+	return {
+		--controller state
+		st=init_st,
+		
+		--set controller state
+		set=function(self,n_st) 
+			if(self.st!=n_st)then
+				self.st=n_st
+			end
+		end,
+		
+		get_cur_st_cont=function(self)
+			return st_conts[self.st]
+		end,
+
+		update=function(self)
+			local cur_c
+			cur_c=self:get_cur_st_cont()
+			
+			cur_c(self,scr_st)
+		end
+	}
+end
+
 -->8
 --explore state
 
@@ -208,7 +234,7 @@ function mk_explore_st()
 		end
 	end
 
-	st.controller=mk_explore_cont(st)
+	st.controller=mk_controller(st,explore_control_states,'walk')
 
 	return st
 end
@@ -419,41 +445,8 @@ room_defs[2]={
 	}
 }
 
+
 ----- controller -----
-
-
-function mk_explore_cont(scr_st)
-	exam_tbl(scr_st)
-	return {
-		--controller state
-		st='walk',
-
-		st_conts={
-			walk=run_walk_inputs,
-			dia=run_dia_inputs
-		},
-		
-		--set controller state
-		set=function(self,n_st) 
-			if(self.st!=n_st)then
-				self.st=n_st
-			end
-		end,
-		
-		get_cur_st_cont=function(self)
-			return self.st_conts[self.st]
-		end,
-
-		update=function(self)
-			local cur_c
-			cur_c=self:get_cur_st_cont()
-			cur_c(self,scr_st)
-		end
-	}
-end
-
-
------ walk controls -----
 
 
 function run_walk_inputs(self,scr_st)
@@ -489,10 +482,6 @@ function run_walk_inputs(self,scr_st)
 		p.st='idle'
 	end
 end
-	
-
------ dialogue controls -----
-
 
 function run_dia_inputs(self, scr_st)
 	local d = scr_st.dia
@@ -503,6 +492,10 @@ function run_dia_inputs(self, scr_st)
 	end
 end
 
+explore_control_states={
+	walk=run_walk_inputs,
+	dia=run_dia_inputs
+}
 
 -->8
 --explore entities
@@ -518,6 +511,15 @@ function mk_player(x,y)
 			anim_tbl=anim_tbls.ex_player
 		})
 	}
+
+	function p:update()
+		p.anim:set(p.st)
+		p.anim:update()
+	end
+	
+	function p:draw()
+		self.anim:draw(self.x,self.y,self.right)
+	end
 	
 	function p:move(dir)
 		if(dir==⬆️)then
@@ -590,34 +592,14 @@ function mk_player(x,y)
 		local mcx=ceil(self.x/8)
 		local mcy=ceil(self.y/8)
 --		rect(mx*8,my*8,mx*8+8,my*8+8)
-	 local	mfs=mget(mfx,mfy)
-	 local	mcs=mget(mcx,mcy)
-	 local mff=fget(mfs,0)
-	 local mcf=fget(mcs,0)
-	 if(mff)add(walls,{mfx*8,mfy*8})
-	 if(mcf)add(walls,{mcx*8,mcy*8})
+		local	mfs=mget(mfx,mfy)
+		local	mcs=mget(mcx,mcy)
+		local mff=fget(mfs,0)
+		local mcf=fget(mcs,0)
+		if(mff)add(walls,{mfx*8,mfy*8})
+		if(mcf)add(walls,{mcx*8,mcy*8})
 	 
 	 return walls
-	end
-	
-	function p:update()
-		p.anim:set(p.st)
-		p.anim:update()
-	end
-	
-	function p:draw()
---		for r in all(room.walls) do
---			rect(r[1],r[2],r[3],r[4],7)
---		end
---		local uc=self:u_col()
---		local rc=self:r_col()
---		local dc=self:d_col()
---		local lc=self:l_col()
---		rect(uc[1],uc[2],uc[3],uc[4],7)
---		rect(rc[1],rc[2],rc[3],rc[4],9)
---		rect(dc[1],dc[2],dc[3],dc[4],10)
---		rect(lc[1],lc[2],lc[3],lc[4],11)
-		self.anim:draw(self.x,self.y,self.right)
 	end
 	
 	return p
@@ -957,6 +939,18 @@ function copy_tbl_into(src,tar)
 	end
 end
 
+function copy_tbl(src)
+	local copy_tbl={}
+	for item in all(tbl) do
+		local copy_item=item
+			if(type(item) =='table')then
+				copy_item=copy_tbl(item)
+			end
+		add(copy_tbl,item)
+	end
+	return copy_tbl
+end
+
 function map_seq(tbl,func)
 	local copy_tbl={}
 	for item in all(tbl) do
@@ -1077,10 +1071,26 @@ function exam_tbl(tbl)
 		printh(v,'logs/test2')
 	end
 end
+
+function draw_side_col(e)
+	for r in all(room.walls) do
+		rect(r[1],r[2],r[3],r[4],7)
+	end
+	local uc=e:u_col()
+	local rc=e:r_col()
+	local dc=e:d_col()
+	local lc=e:l_col()
+	rect(uc[1],uc[2],uc[3],uc[4],7)
+	rect(rc[1],rc[2],rc[3],rc[4],9)
+	rect(dc[1],dc[2],dc[3],dc[4],10)
+	rect(lc[1],lc[2],lc[3],lc[4],11)
+end
 -->8
 --type def
 
 
+printh(explore_control_states,'logs/ex')
+exam_tbl(explore_control_states)
 ----- box -----
 
 
@@ -1099,19 +1109,19 @@ function mk_combat_st()
 	st.turn='heroes'
 	st.g_off=0
 	st.party=mk_c_party()
+	st.e_party=mk_e_party()
 	st.shake=2
 	st.pg=mk_grid( --player grid
 		{
 			x=10,
 			y=30,
 			ents=st.party
---			sel=5
 		}
 	)
 	st.eg=mk_grid({ --enemy grid
 		x=70,
 		y=30,
-		ents=mk_e_party()
+		ents=st.e_party
 	})
 	st.hand=mk_hand(st.party)
 	
@@ -1137,360 +1147,265 @@ function mk_combat_st()
 --		draw_card(20,85,self.hand.cards[1])
 	end
 	
-	function st.mk_combat_cont()
-		local cont={
-			st='sel_c',
-			st_conts={}
-		}
-		function cont:set(st)
-			if(self.st!=st)then
-				self.st=st
-			end
-		end
-		
-		function cont:update(a_st)
-			local cont 
-			cont=self.st_conts[self.st]
-			cont(self,a_st)
-		end
-		
-		function cont.st_conts:sel_c(a_st)
-			local hand=a_st.hand
-			local selected_c=hand.cards[hand.sel]
-			if(btnp(⬆️) or btnp(➡️))then
-			 hand.sel+=1
-			 if(hand.sel>#hand.cards)then
-			 	hand.sel=1
-			 end
-			end
-			if(btnp(⬅️) or btnp(⬇️))then
-				hand.sel-=1
-				if(hand.sel<1)then
-			 	hand.sel=#hand.cards
-			 end
-			end
-			
-			if(btnp(🅾️)and selected_c.owner.active)then
-				a_st.cont:set('sel_t')
-				a_st.tar_t=a_st.eg
-			end
-			
-			if(btnp(❎))then
-				a_st.cont:set('sel_g')
-				a_st.hand.sel=nil
-				a_st.pg.sel=5
-				a_st.tar_t=a_st.pg
-			end
-		end
-
-		function	cont.st_conts:sel_g(a_st)
-			local t=a_st.tar_t
-			local eg=a_st.eg
-			local pg=a_st.pg
-			local sel=t.sel
-			if(btnp(⬆️)and sel>3)then
-			 t.sel-=3
-			end
-			if(btnp(➡️))then
-				if(sel%3==0)then
-					if(t==pg)then
-						local cs=sel
-						t.sel=nil
-						a_st.tar_t=eg
-						t=eg
-						t.sel=cs-2
-					end
-				else
-					t.sel+=1
-				end
-			end
-			if(btnp(⬇️)and sel<7)then
-				t.sel+=3
-			end
-			if(btnp(⬅️))then
-				if(sel==1
-					or sel==4
-					or sel==7
-				)then
-					if(t==eg)then
-						local cs=sel
-						t.sel=nil
-						a_st.tar_t=pg
-						t=pg
-						t.sel=cs+2
-					end
-				else
-					t.sel-=1
-				end
-			end
-			if(btnp(❎))then
-				a_st.hand.sel=1
-				a_st.tar_t.sel=nil
-				a_st.cont.st='sel_c'
-				a_st.tar_t=nil
-			end
-			
-		end
-		
-		function cont.st_conts:sel_t(a_st)
-			local t=a_st.tar_t
-			local pg=a_st.pg
-			local eg=a_st.eg
-			if(btnp(➡️) and t==pg)then
-				a_st.tar_t=eg
-			end
-			if(btnp(⬅️) and t==eg)then
-				a_st.tar_t=pg
-			end
-			if(btnp(🅾️))then
---				a_st.tar_t=nil
-				a_st.cont.st='wait'
-				sfx(1,1)
-				self.w_stamp=timer
---				a_st.hand.sel=nil
-			end
-			if(btnp(❎))then
-				a_st.tar_t=nil
-				a_st.cont.st='sel_c'
-			end
-		end
-		
-		function cont.st_conts:wait(a_st)
-			
-			local act_card=a_st.act_card
-			local tar_t=a_st.tar_t
-
-			if(act_card==nil)then
-				if(a_st.turn=='enemy')then
-					local e=sel_active_e(a_st.eg)
-					
-					local cs=flr(rnd(#e.hand))+1
-					local	c=e.hand[cs]
-			
-					a_st.act_card=c
-					
-					--find effect with most
-					--positions
-					--use that
-					
-					local ef_count={
-						atk=0,
-						heal=0,
-						move=0
-					}
-					for t in all(c.card.tar)do
-						ef_count[t.ef]+=1
-					end
-					
-					local most_ef
-					local high_ef_count=0
-					for k,v in pairs(ef_count)do
-						if(v>high_ef_count)then
-							high_ef_count=v
-							most_ef=k
-						end
-					end
-					if(most_ef=='atk')then
-						a_st.tar_t=a_st.pg
-					end
-					if(most_ef=='heal')then
-						a_st.tar_t=a_st.eg
-					end
-					if(most_ef=='move')then
-						local t=flr(rnd(2))					
-						a_st.tar_t=a_st.eg
-						if(t==1) then
-							a_st.tar_t=a_st.pg
-						end
-					end
-				else
-					local hs=a_st.hand.sel
-					local cs=a_st.hand.cards[hs]
-					a_st.act_card=cs
-				end
-				act_card=a_st.act_card
-				act_card.owner.active=false
-				act_card.owner.anim:set('casting')
-				sfx(1,1)
-			end
-			local cs = act_card
-
-			if(timer-self.w_stamp==30)then
-				sfx(-1,1)
-				sfx(2)
-				
-				local tar_p=act_card.card.tar
-				local tar_e={}
-				for e in all(a_st.tar_t.ents) do
-					for p in all(tar_p) do
-						if (e.pos==p.pos)then
-							if(p.ef=='atk')then
-								e.hp-=cs.owner.attr.atk
-							end
-							if(p.ef=='heal')then
-								e.hp+=cs.owner.attr.heal
-							end
-							if(p.ef=='move')then
-								local tp
-								tp=nav_grid(p.dir,p.pos)
-								local ok=true
-								for et in all(tar_t.ents)do
-									if(et.pos==tp) ok=false
-								end
-								if(ok)e.pos=tp
-							end
-						end
-					end
-					if(e.hp>e.attr.maxhp)e.hp=e.attr.maxhp
-					if(e.hp<1)then
-						del(tar_t.ents,e)
-					end
-				end
-			end
-			if(timer-self.w_stamp>30)then
-				a_st.g_off=a_st.shake
-				if(timer%2==0)a_st.shake=-a_st.shake
-			end
-			if(timer-self.w_stamp>50)then
-				a_st.g_off=0
-				cs.owner.anim:set('idle')
-				if(a_st.turn=='enemy')then
-					local active_e = false
-					for e in all(a_st.eg.ents)do
-						if(e.active)active_e=true
-					end
-					if(not active_e)then
-						for e in all(a_st.eg.ents)do
-							e.active=true
-						end
-					end
-					a_st.cont.st='sel_c'
-					a_st.turn='heroes'
-				else
-					local active_e = false
-					for e in all(a_st.pg.ents)do
-						if(e.active)active_e=true
-					end
-					if(not active_e)then
-						for e in all(a_st.pg.ents)do
-							e.active=true
-						end
-					end
-					local o=act_card.owner
-					del(a_st.hand.cards,act_card)
-					local new_c=pull_card(o.used_c,o.deck)
-					exam_tbl(o.deck[1])
-					add(a_st.hand.cards,{owner=o,card=o.deck[new_c]})
-					if(#o.used_c==#o.deck)then
-						o.used_c={}
-					end
-					a_st.turn='enemy'
-					self.w_stamp=timer
-				end
-				a_st.tar_t=nil
-				a_st.act_card=nil
-			end
-		end
-		
-		function sel_active_e(eg)
-			local sel = flr(rnd(#eg.ents))+1
-			local e = eg.ents[sel]
-			if(not e.active) e = sel_active_e(eg)
-			return e
-		end
-		
-		function cont.st_conts:e_turn(a_st)
-			local e=sel_active_e(a_st.eg)
-			local cs=flr(rnd(#e.hand))+1
-			local	c=e.hand[cs]
-			if(c.card.ef=='atk')then
-				a_st.tar_t=a_st.pg
-			end
-			if(c.card.ef=='heal')then
-				a_st.tar_t=a_st.eg
-			end
-			if(c.card.ef=='move')then
-				local t=flr(rnd(2))					
-				a_st.tar_t=a_st.eg
-				if(t==1) a_st.tar_t=a_st.pg
-			end
-		end
-			--[x]select a random active enemy
-			--[x]select a random card they own
-			--if atk, target player
-			--if heal, target enemy
-			--if move, target random
-			--wait for effect
-			--run effect
-			--set all e to active if all
-			 --inactive
-			
-			
-			
-			
---			if(timer-self.w_stamp==30)then
---				sfx(-1,1)
---				sfx(2)
---				
---				local hs=a_st.hand.sel
---				local cs=a_st.hand.cards[hs]
---				local tar_t=a_st.tar_t
---				local tar_p=cs.card.tar
---				local tar_e={}
---				for e in all(tar_t.ents) do
---					for p in all(tar_p) do
---						if (e.pos==p.pos)then
---							if(p.ef=='atk')then
---								e.hp-=cs.owner.attr.atk
---							end
---							if(p.ef=='heal')then
---								e.hp+=cs.owner.attr.heal
---							end
---							if(p.ef=='move')then
---								local tp
---								tp=nav_grid(p.dir,p.pos)
---								local ok=true
---								for et in all(tar_t.ents)do
---									if(et.pos==tp) ok=false
---								end
---								if(ok)e.pos=tp
---							end
---						end
---					end
---					if(e.hp>e.attr.maxhp)e.hp=e.attr.maxhp
---					if(e.hp<1)then
---						del(tar_t.ents,e)
---					end
---				end
---			end
---			if(timer-self.w_stamp>30)then
---				a_st.g_off=a_st.shake
---				if(timer%2==0)a_st.shake=-a_st.shake
---			end
---			if(timer-self.w_stamp>50)then
---				a_st.g_off=0
---				local hs=a_st.hand.sel
---				local c=a_st.hand.cards[hs]
---				c.owner.anim:set('idle')
---				a_st.cont:set('sel_c')
---				a_st.tar_t=nil
---			end
---		end
-		
-		function	cont.st_conts:dia(a_st)
---			local d = a_st.dia
---			if(btnp(🅾️)) d.cur+=1
---			if(d.cur>#d.txt)then
---				cont:set('walk')
---				a_st.dia=nil
---			end
-		end		
-		return cont
-	end
-	
-	st.cont=st:mk_combat_cont()
+	st.cont=mk_controller(st,combat_control_states,'sel_c')
 	return st
 end
+
+
+----- controller -----
+
+
+function run_sel_card_inputs(self,scr_st)
+	local hand=scr_st.hand
+	local selected_c=hand.cards[hand.sel]
+	if(btnp(⬆️) or btnp(➡️))then
+		hand.sel+=1
+		if(hand.sel>#hand.cards)then
+		hand.sel=1
+		end
+	end
+	if(btnp(⬅️) or btnp(⬇️))then
+		hand.sel-=1
+		if(hand.sel<1)then
+		hand.sel=#hand.cards
+		end
+	end
+	
+	if(btnp(🅾️)and selected_c.owner.active)then
+		scr_st.cont:set('sel_t')
+		scr_st.tar_t=scr_st.eg
+	end
+	
+	if(btnp(❎))then
+		scr_st.cont:set('sel_g')
+		scr_st.hand.sel=nil
+		scr_st.pg.sel=5
+		scr_st.tar_t=scr_st.pg
+	end
+end
+
+function run_sel_grid_inputs(self,scr_st)
+	local t=scr_st.tar_t
+	local eg=scr_st.eg
+	local pg=scr_st.pg
+	local sel=t.sel
+	if(btnp(⬆️)and sel>3)then
+		t.sel-=3
+	end
+	if(btnp(➡️))then
+		if(sel%3==0)then
+			if(t==pg)then
+				local cs=sel
+				t.sel=nil
+				scr_st.tar_t=eg
+				t=eg
+				t.sel=cs-2
+			end
+		else
+			t.sel+=1
+		end
+	end
+	if(btnp(⬇️)and sel<7)then
+		t.sel+=3
+	end
+	if(btnp(⬅️))then
+		if(sel==1
+			or sel==4
+			or sel==7
+		)then
+			if(t==eg)then
+				local cs=sel
+				t.sel=nil
+				scr_st.tar_t=pg
+				t=pg
+				t.sel=cs+2
+			end
+		else
+			t.sel-=1
+		end
+	end
+	if(btnp(❎))then
+		scr_st.hand.sel=1
+		scr_st.tar_t.sel=nil
+		scr_st.cont.st='sel_c'
+		scr_st.tar_t=nil
+	end
+end
+
+function run_sel_tar_inputs(self,scr_st)
+	local t=scr_st.tar_t
+	local pg=scr_st.pg
+	local eg=scr_st.eg
+	if(btnp(➡️) and t==pg)then
+		scr_st.tar_t=eg
+	end
+	if(btnp(⬅️) and t==eg)then
+		scr_st.tar_t=pg
+	end
+	if(btnp(🅾️))then
+--				scr_st.tar_t=nil
+		scr_st.cont.st='wait'
+		sfx(1,1)
+		self.w_stamp=timer
+--				scr_st.hand.sel=nil
+	end
+	if(btnp(❎))then
+		scr_st.tar_t=nil
+		scr_st.cont.st='sel_c'
+	end
+end
+
+function run_wait_inputs(self,scr_st)
+	local act_card=scr_st.act_card
+	local tar_t=scr_st.tar_t
+
+	if(act_card==nil)then
+		if(scr_st.turn=='enemy')then
+			local e=sel_active_e(scr_st.eg)
+			
+			local cs=flr(rnd(#e.hand))+1
+			local	c=e.hand[cs]
+	
+			scr_st.act_card=c
+			
+			--find effect with most
+			--positions
+			--use that
+			
+			local ef_count={
+				atk=0,
+				heal=0,
+				move=0
+			}
+			for t in all(c.card.tar)do
+				ef_count[t.ef]+=1
+			end
+			
+			local most_ef
+			local high_ef_count=0
+			for k,v in pairs(ef_count)do
+				if(v>high_ef_count)then
+					high_ef_count=v
+					most_ef=k
+				end
+			end
+			if(most_ef=='atk')then
+				scr_st.tar_t=scr_st.pg
+			end
+			if(most_ef=='heal')then
+				scr_st.tar_t=scr_st.eg
+			end
+			if(most_ef=='move')then
+				local t=flr(rnd(2))					
+				scr_st.tar_t=scr_st.eg
+				if(t==1) then
+					scr_st.tar_t=scr_st.pg
+				end
+			end
+		else
+			local hs=scr_st.hand.sel
+			local cs=scr_st.hand.cards[hs]
+			scr_st.act_card=cs
+		end
+		act_card=scr_st.act_card
+		act_card.owner.active=false
+		act_card.owner.anim:set('casting')
+		sfx(1,1)
+	end
+	local cs = act_card
+
+	if(timer-self.w_stamp==30)then
+		sfx(-1,1)
+		sfx(2)
+		
+		local tar_p=act_card.card.tar
+		local tar_e={}
+		for e in all(scr_st.tar_t.ents) do
+			for p in all(tar_p) do
+				if (e.pos==p.pos)then
+					if(p.ef=='atk')then
+						e.hp-=cs.owner.attr.atk
+					end
+					if(p.ef=='heal')then
+						e.hp+=cs.owner.attr.heal
+					end
+					if(p.ef=='move')then
+						local tp
+						tp=nav_grid(p.dir,p.pos)
+						local ok=true
+						for et in all(tar_t.ents)do
+							if(et.pos==tp) ok=false
+						end
+						if(ok)e.pos=tp
+					end
+				end
+			end
+			if(e.hp>e.attr.maxhp)e.hp=e.attr.maxhp
+			if(e.hp<1)then
+				del(tar_t.ents,e)
+			end
+		end
+	end
+	if(timer-self.w_stamp>30)then
+		scr_st.g_off=scr_st.shake
+		if(timer%2==0)scr_st.shake=-scr_st.shake
+	end
+	if(timer-self.w_stamp>50)then
+		scr_st.g_off=0
+		cs.owner.anim:set('idle')
+		if(scr_st.turn=='enemy')then
+			local active_e = false
+			for e in all(scr_st.eg.ents)do
+				if(e.active)active_e=true
+			end
+			if(not active_e)then
+				for e in all(scr_st.eg.ents)do
+					e.active=true
+				end
+			end
+			scr_st.cont.st='sel_c'
+			scr_st.turn='heroes'
+		else
+			local active_e = false
+			for e in all(scr_st.pg.ents)do
+				if(e.active)active_e=true
+			end
+			if(not active_e)then
+				for e in all(scr_st.pg.ents)do
+					e.active=true
+				end
+			end
+			local o=act_card.owner
+			del(scr_st.hand.cards,act_card)
+			local new_c=pull_card(o.used_c,o.deck)
+			add(scr_st.hand.cards,{owner=o,card=o.deck[new_c]})
+			if(#o.used_c==#o.deck)then
+				o.used_c={}
+			end
+			scr_st.turn='enemy'
+			self.w_stamp=timer
+		end
+		scr_st.tar_t=nil
+		scr_st.act_card=nil
+	end
+end
+
+function sel_active_e(eg)
+	local sel = flr(rnd(#eg.ents))+1
+	local e = eg.ents[sel]
+	if(not e.active) e = sel_active_e(eg)
+	return e
+end
+
+combat_control_states={
+	sel_c=run_sel_card_inputs,
+	sel_g=run_sel_grid_inputs,
+	sel_t=run_sel_tar_inputs,
+	wait=run_wait_inputs
+}
+
+
+----- helpers -----
 
 function mk_grid(opt)
 	local grid={
@@ -1802,7 +1717,6 @@ function mk_c_party()
 	
 	local filled_pos={}
 	for m in all(party) do
-		exam_tbl(party[3])
 		local ch = m.ch
 		local name=ch.name
 		local deck={}
