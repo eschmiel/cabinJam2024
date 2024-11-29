@@ -1304,51 +1304,15 @@ function run_wait_inputs(self,scr_st)
 
 	if(act_card==nil)then
 		if(scr_st.turn=='enemy')then
-			local e=sel_active_e(scr_st.eg)
-			
-			local cs=flr(rnd(#e.hand))+1
-			local	c=e.hand[cs]
-	
-			scr_st.act_card=c
-			
-			--find effect with most
-			--positions
-			--use that
-			
-			local ef_count={
-				atk=0,
-				heal=0,
-				move=0
-			}
-			for t in all(c.card.tar)do
-				ef_count[t.ef]+=1
-			end
-			
-			local most_ef
-			local high_ef_count=0
-			for k,v in pairs(ef_count)do
-				if(v>high_ef_count)then
-					high_ef_count=v
-					most_ef=k
-				end
-			end
-			if(most_ef=='atk')then
+			local act=run_e_turn(scr_st)
+			scr_st.act_card=act.card
+			if(act.tar=='player') then
 				scr_st.tar_t=scr_st.pg
-			end
-			if(most_ef=='heal')then
+			else
 				scr_st.tar_t=scr_st.eg
-			end
-			if(most_ef=='move')then
-				local t=flr(rnd(2))					
-				scr_st.tar_t=scr_st.eg
-				if(t==1) then
-					scr_st.tar_t=scr_st.pg
-				end
 			end
 		else
-			local hs=scr_st.hand.sel
-			local cs=scr_st.hand.cards[hs]
-			scr_st.act_card=cs
+			scr_st.act_card=scr_st.hand:sel_c()
 		end
 		act_card=scr_st.act_card
 		act_card.owner.active=false
@@ -1449,6 +1413,67 @@ combat_control_states={
 
 
 ----- helpers -----
+
+
+function run_action()
+
+end
+
+function run_e_turn(scr_st)
+	local e=sel_active_e(scr_st.eg)
+
+	local c=sel_rand_card(e.hand)
+	local tar=get_e_tar(c)
+
+	local action={card=c,tar=tar}
+	return action
+end
+
+function sel_rand_card(hand)
+	local c_sel=flr(rnd(#hand))+1
+	return hand[c_sel]
+end
+
+function get_e_tar(c)
+	local tar
+	local ef_count={
+		atk=0,
+		heal=0,
+		move=0
+	}
+
+	for t in all(c.card.tar)do
+		ef_count[t.ef]+=1
+	end
+
+	local most_ef=find_largest_val(ef_count).k
+	if(most_ef=='atk')then
+		tar='player'
+	end
+	if(most_ef=='heal')then
+		tar='enemy'
+	end
+	if(most_ef=='move')then
+		local t=flr(rnd(2))					
+		tar="enemy"
+		if(t==1) then
+			tar="player"
+		end
+	end
+
+	return tar
+end
+
+function find_largest_val(tbl)
+	local largest={k=1,v=0}
+	for k,v in pairs(tbl)do
+		if(v>largest.v)then
+			largest.v=v
+			largest.k=k
+		end
+	end
+	return largest
+end
 
 function mk_grid(opt)
 	local grid={
